@@ -209,7 +209,7 @@ void bl31_early_platform_setup2(u_register_t arg0, u_register_t arg1,
 		u_register_t arg2, u_register_t arg3)
 {
 #if DEBUG_CONSOLE
-	static console_uart_t console;
+	static console_t console;
 #endif
 	unsigned int val;
 	int i;
