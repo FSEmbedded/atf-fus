@@ -248,8 +248,24 @@ int imx_system_reset2(int is_vendor, int reset_type, u_register_t cookie)
 
 void __dead2 imx_system_off(void)
 {
+#if 1
+	/*
+	 * 2024-02-27 F&S:
+	 * Do not blindly activate the alarm; if the alarm is not set in the
+	 * rtc-snvs in Linux, the alarm is already triggered (Bit LPTA in
+	 * SNVS_LPSR is set) due to a match of alarm time and real time
+	 * counter at value 0 when powering up. Then the board will
+	 * immediately wake up again after power off. Actually ignore the
+	 * alarm bits here, they are set by rtc-snvs already. Simply add the
+	 * bits for the real time counter RTC and for the power switching.
+	 */
+	mmio_setbits_32(IMX_SNVS_BASE + SNVS_LPCR,
+			SNVS_LPCR_SRTC_ENV | SNVS_LPCR_DP_EN | SNVS_LPCR_TOP);
+#else
+	/* NXP: unconditionally activate alarm and RTC and switch off power */
 	mmio_write_32(IMX_SNVS_BASE + SNVS_LPCR, SNVS_LPCR_SRTC_ENV |
 			SNVS_LPCR_DP_EN | SNVS_LPCR_TOP | SNVS_LPCR_LPTA_EN | SNVS_LPCR_LPWUI_EN);
+#endif
 
 	while (1)
 		;
