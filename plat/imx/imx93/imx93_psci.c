@@ -20,12 +20,14 @@
 #include <plat_imx8.h>
 
 #define BLK_CTRL_S_BASE                0x444F0000
+#define M33_CFG_OFF            	0x60
 #define CA55_CPUWAIT           0x118
 #define CA55_RVBADDR0_L                0x11c
 #define CA55_RVBADDR0_H                0x120
 #define HW_LP_HANDHSK		0x110
 #define HW_LP_HANDHSK2		0x114
 #define HW_S401_RESET_REQ_MASK  0x130
+#define M33_CPU_WAIT_MASK      BIT(2)
 
 #define IMX_SRC_BASE		0x44460000
 #define IMX_GPC_BASE		0x44470000
@@ -41,6 +43,8 @@
 #define MEM_LP_RETENTION	BIT(1)
 
 /* GPC */
+#define GPC_CMCx(i)	(IMX_GPC_BASE + 0x800 * (i))
+#define CM_IMR0		U(0x100)
 #define A55C0_CMC_OFFSET	0x800
 #define CM_MISC		0xc
 #define IRQ_MUX		BIT(5)
@@ -83,17 +87,32 @@
 
 #define ARM_PLL		U(0x44481000)
 #define SYS_PLL		U(0x44481100)
+#define SYS_PLL_DFS_0	U(SYS_PLL + 0x70)
+#define SYS_PLL_DFS_1	U(SYS_PLL + 0x90)
+#define SYS_PLL_DFS_2	U(SYS_PLL + 0xb0)
 #define OSCPLL_CHAN(x)	(0x44455000 + (x) * 0x40)
+#define OSCPLL_NUM	U(12)
 #define OSCPLL_LPM0	U(0x10)
 #define OSCPLL_LPM_DOMAIN_MODE(x, d) ((x) << (d * 4))
 #define OSCPLL_LPM_AUTH	U(0x30)
 #define PLL_HW_CTRL_EN	BIT(16)
 #define LPCG(x) 	(0x44458000 + (x) * 0x40)
+#define LPCG_AUTH	U(0x30)
+#define LPCG_CUR	U(0x1c)
+#define CPU_LPM_EN	BIT(2)
+#define CCM_ROOT_SLICE(x)	(0x44450000 + (x) * 0x80)
+#define ROOT_MUX_MASK	GENMASK_32(9, 8)
+#define ROOT_CLK_OFF	BIT(24)
 
 #define S400_MU_RSR	(S400_MU_BASE + 0x12c)
 #define S400_MU_TRx(i)	(S400_MU_BASE + 0x200 + (i) * 4)
 #define S400_MU_RRx(i)	(S400_MU_BASE + 0x280 + (i) * 4)
 #define ELE_POWER_DOWN_REQ	U(0x17d10306)
+
+#define MU1B_BASE	(0x44230000)
+#define MU1B_GIER	(MU1B_BASE + 0x110)
+#define MU1B_GSR	(MU1B_BASE + 0x118)
+#define MU_GPI1		BIT(1)
 
 #define CORE_PWR_STATE(state) ((state)->pwr_domain_state[MPIDR_AFFLVL0])
 #define CLUSTER_PWR_STATE(state) ((state)->pwr_domain_state[MPIDR_AFFLVL1])
@@ -103,6 +122,41 @@
 #define GPIO_PIN_MAX_NUM		U(32)
 #define GPIO_CTX(addr, num)	\
 	{.base = (addr), .pin_num = (num), }
+
+enum ccm_clock_root {
+	M33_ROOT = 3,
+	WAKEUP_AXI_ROOT = 7,
+	CAN1_ROOT = 23,
+	CAN2_ROOT = 24,
+	UART1_ROOT = 25,
+	UART2_ROOT = 26,
+	UART3_ROOT = 27,
+	UART4_ROOT = 28,
+	UART5_ROOT = 29,
+	UART6_ROOT = 30,
+	UART7_ROOT = 31,
+	UART8_ROOT = 32,
+	HSIO_CLK_ROOT = 61,
+	NIC_CLK_ROOT = 65,
+};
+
+enum ccm_lpcg {
+	MUB_LPCG = 20,
+	GPIO1_LPCG = 34,
+	GPIO2_LPCG = 35,
+	GPIO3_LPCG = 36,
+	GPIO4_LPCG = 37,
+	CAN1_LPCG = 50,
+	CAN2_LPCG = 51,
+	UART1_LPCG = 52,
+	UART2_LPCG = 53,
+	UART3_LPCG = 54,
+	UART4_LPCG = 55,
+	UART5_LPCG = 56,
+	UART6_LPCG = 57,
+	UART7_LPCG = 58,
+	UART8_LPCG = 59,
+};
 
 extern void dram_enter_retention(void);
 extern void dram_exit_retention(void);
@@ -135,6 +189,7 @@ static struct gpio_ctx wakeupmix_gpio_ctx[3] = {
 	GPIO_CTX(GPIO4_BASE | BIT(28), 28),
 };
 
+static uint32_t clock_root[4];
 /*
  * Empty implementation of these hooks avoid setting the GICR_WAKER.Sleep bit
  * on ARM GICv3 implementations without LPI support.
@@ -217,21 +272,101 @@ void gpc_src_init(void)
 	mmio_setbits_32(LPCG(3) + 0x30, BIT(2));
 }
 
+static struct qchannel_hsk_config {
+	const uint32_t lpcg_idx;
+	const uint32_t root_idx;
+	const unsigned int wakeup_irq;
+	uint32_t root_ctrl;
+	uint32_t lpcg_cur;
+	uint32_t lpcg_auth;
+	bool active_wakeup;
+} hsk_config[] = {
+	{ CAN1_LPCG, CAN1_ROOT, 8 },
+	{ CAN2_LPCG, CAN2_ROOT, 51 },
+
+	{ UART1_LPCG, UART1_ROOT, 19 },
+	{ UART2_LPCG, UART2_ROOT, 20 },
+	{ UART3_LPCG, UART3_ROOT, 68 },
+	{ UART4_LPCG, UART4_ROOT, 69 },
+	{ UART5_LPCG, UART5_ROOT, 70 },
+	{ UART6_LPCG, UART6_ROOT, 71 },
+	{ UART7_LPCG, UART7_ROOT, 210 },
+	{ UART8_LPCG, UART8_ROOT, 211 },
+
+	{ GPIO1_LPCG, },
+	{ GPIO2_LPCG, },
+	{ GPIO3_LPCG, },
+	{ GPIO4_LPCG, },
+};
+
+static inline bool is_wakeup_source(unsigned int irq)
+{
+	uint32_t val;
+
+	val = mmio_read_32(GPC_CMCx(3) + CM_IMR0 + 0x4 * (irq / 32));
+	return val & (1 << (irq % 32)) ? false : true;
+}
+/*
+ * For peripherals like CANs, GPIOs & UARTs that need to support async wakeup
+ * when clock is gated, LPCGs of these IPs need to be changed to CPU LPM
+ * controlled, and for CANs &UARTs, we also need to make sure its ROOT clock
+ * slice is enabled.
+ */
+void peripheral_qchannel_hsk(bool en)
+{
+	unsigned int i;
+
+	for (i = 0; i < ARRAY_SIZE(hsk_config); i++) {
+		if (en) {
+			/* Only enable the qchannel handshake for active wakeup used by A55 */
+			if (!hsk_config[i].wakeup_irq || is_wakeup_source(hsk_config[i].wakeup_irq)) {
+				hsk_config[i].active_wakeup = true;
+				if (hsk_config[i].root_idx) {
+					hsk_config[i].root_ctrl = mmio_read_32(CCM_ROOT_SLICE(hsk_config[i].root_idx));
+					mmio_clrbits_32(CCM_ROOT_SLICE(hsk_config[i].root_idx), ROOT_CLK_OFF);
+				}
+
+				hsk_config[i].lpcg_auth = mmio_read_32(LPCG(hsk_config[i].lpcg_idx) + LPCG_AUTH);
+				hsk_config[i].lpcg_cur = mmio_read_32(LPCG(hsk_config[i].lpcg_idx) + LPCG_CUR);
+				mmio_setbits_32(LPCG(hsk_config[i].lpcg_idx) + LPCG_AUTH, CPU_LPM_EN);
+				mmio_write_32(LPCG(hsk_config[i].lpcg_idx) + LPCG_CUR, 0x2);
+			} else {
+				hsk_config[i].active_wakeup = false;
+			}
+		} else if (hsk_config[i].active_wakeup) {
+			/* restore the initial config */
+			mmio_write_32(LPCG(hsk_config[i].lpcg_idx) + LPCG_CUR, hsk_config[i].lpcg_cur);
+			mmio_write_32(LPCG(hsk_config[i].lpcg_idx) + LPCG_AUTH, hsk_config[i].lpcg_auth);
+			if (hsk_config[i].root_idx) {
+				mmio_write_32(CCM_ROOT_SLICE(hsk_config[i].root_idx), hsk_config[i].root_ctrl);
+			}
+		}
+	}
+}
+
 void pll_pwr_down(bool enter)
 {
 	if(enter) {
-		/* switch all the PLLs to hw_ctrl(bit 16) in PLL CTRL reg */
+		/* Switch the ARM/SYS PLLs to hw_ctrl(bit 16) in PLL CTRL reg */
 		mmio_setbits_32(ARM_PLL, PLL_HW_CTRL_EN);
+		mmio_setbits_32(SYS_PLL, PLL_HW_CTRL_EN);
+		mmio_setbits_32(SYS_PLL_DFS_0, PLL_HW_CTRL_EN);
+		mmio_setbits_32(SYS_PLL_DFS_1, PLL_HW_CTRL_EN);
+		mmio_setbits_32(SYS_PLL_DFS_2, PLL_HW_CTRL_EN);
 
 		/* LPM setting for PLL */
-		for (unsigned int i = 1; i <= 2; i++) {
+		for (unsigned int i = 1; i <= OSCPLL_NUM; i++) {
 			mmio_setbits_32(OSCPLL_CHAN(i) + OSCPLL_LPM0, OSCPLL_LPM_DOMAIN_MODE(0x1, 0x3));
 			mmio_setbits_32(OSCPLL_CHAN(i) + OSCPLL_LPM_AUTH, BIT(2));
 		}
 	} else {
 		mmio_clrbits_32(ARM_PLL, PLL_HW_CTRL_EN);
+		mmio_clrbits_32(SYS_PLL, PLL_HW_CTRL_EN);
+		mmio_clrbits_32(SYS_PLL_DFS_0, PLL_HW_CTRL_EN);
+		mmio_clrbits_32(SYS_PLL_DFS_1, PLL_HW_CTRL_EN);
+		mmio_clrbits_32(SYS_PLL_DFS_2, PLL_HW_CTRL_EN);
 
-		for (unsigned int i = 1; i <= 2; i++) {
+		for (unsigned int i = 1; i <= OSCPLL_NUM; i++) {
 			mmio_clrbits_32(OSCPLL_CHAN(i) + OSCPLL_LPM_AUTH, BIT(2));
 		}
 	}
@@ -268,10 +403,21 @@ void imx_set_sys_wakeup(unsigned int last_core, bool pdn)
 		 */
 		mmio_clrbits_32(IMX_GPC_BASE + A55C0_CMC_OFFSET + 0x800 * 2 + CM_MISC, IRQ_MUX);
 		mmio_clrbits_32(IMX_GPC_BASE + A55C0_CMC_OFFSET + 0x800 * last_core + CM_MISC, IRQ_MUX);
+
+		/* make sure MUB side clock is enabled */
+		mmio_write_32(LPCG(MUB_LPCG), 0x1);
+		/* enable the MU1B general interrupt 1 for M33 SW to wakeup A55 by assert an interrupt */
+		mmio_setbits_32(MU1B_GIER, MU_GPI1);
 	} else {
 		/* switch to GIC wakeup source for last_core and cluster */
 		mmio_setbits_32(IMX_GPC_BASE + A55C0_CMC_OFFSET + 0x800 * 2 + CM_MISC, IRQ_MUX);
 		mmio_setbits_32(IMX_GPC_BASE + A55C0_CMC_OFFSET + 0x800 * last_core + CM_MISC, IRQ_MUX);
+
+		/* make sure MUB side clock is enabled */
+		mmio_write_32(LPCG(MUB_LPCG), 0x1);
+		/* clear pending General interrupt 1 and disable the it */
+		mmio_clrbits_32(MU1B_GIER, MU_GPI1);
+		mmio_setbits_32(MU1B_GSR, MU_GPI1);
 	}
 
 	/* Set the GPC IMRs based on GIC IRQ mask setting */
@@ -327,6 +473,14 @@ void nicmix_pwr_down(unsigned int core_id)
 	/* enable the handshake between sentinel & NICMIX */
 	mmio_setbits_32(BLK_CTRL_S_BASE + HW_LP_HANDHSK, BIT(11));
 
+	/* swith wakeup axi, hsio & nic to 24M when NICMIX power down */
+	clock_root[1] = mmio_read_32(CCM_ROOT_SLICE(WAKEUP_AXI_ROOT));
+	clock_root[2] = mmio_read_32(CCM_ROOT_SLICE(HSIO_CLK_ROOT));
+	clock_root[3] = mmio_read_32(CCM_ROOT_SLICE(NIC_CLK_ROOT));
+	mmio_clrbits_32(CCM_ROOT_SLICE(WAKEUP_AXI_ROOT), ROOT_MUX_MASK);
+	mmio_clrbits_32(CCM_ROOT_SLICE(HSIO_CLK_ROOT), ROOT_MUX_MASK);
+	mmio_clrbits_32(CCM_ROOT_SLICE(NIC_CLK_ROOT), ROOT_MUX_MASK);
+
 	/* NICMIX */
 	mmio_write_32(IMX_SRC_BASE + 0x1c00 + 0x14, BIT(12));
 	mmio_clrsetbits_32(IMX_SRC_BASE + 0x1c00 + 0x4, 0xffff0000, BIT(19) | BIT(2));
@@ -342,6 +496,10 @@ void nicmix_pwr_down(unsigned int core_id)
 
 void nicmix_pwr_up(unsigned int core_id)
 {
+	mmio_setbits_32(CCM_ROOT_SLICE(WAKEUP_AXI_ROOT), clock_root[1] & ROOT_MUX_MASK);
+	mmio_setbits_32(CCM_ROOT_SLICE(HSIO_CLK_ROOT), clock_root[2] & ROOT_MUX_MASK);
+	mmio_setbits_32(CCM_ROOT_SLICE(NIC_CLK_ROOT), clock_root[3] & ROOT_MUX_MASK);
+
 	/* keep nicmix on when exit from system suspend */
 	mmio_write_32(IMX_SRC_BASE + 0x1c00 + 0x14, BIT(12) | BIT(13));
 	trdc_n_reinit();
@@ -434,6 +592,10 @@ void wakeupmix_pwr_down(void)
 {
 	gpio_save(wakeupmix_gpio_ctx, 3);
 	if (no_wakeup_enabled) {
+		/* m33 root need to switch to 24M OSC when wakeupmix power down */
+		clock_root[0] = mmio_read_32(CCM_ROOT_SLICE(M33_ROOT));
+		mmio_clrbits_32(CCM_ROOT_SLICE(M33_ROOT), ROOT_MUX_MASK);
+
 		/* wakeup mix controlled by A55 cluster power down: domain3 only */
 		mmio_write_32(IMX_SRC_BASE + 0xc00 + 0x14, BIT(12));
 		mmio_clrsetbits_32(IMX_SRC_BASE + 0xc00 + 0x4, 0xffff0000, BIT(19) | BIT(2));
@@ -447,6 +609,7 @@ void wakeupmix_pwr_down(void)
 void wakeupmix_pwr_up(void)
 {
 	if (no_wakeup_enabled) {
+		mmio_setbits_32(CCM_ROOT_SLICE(M33_ROOT), clock_root[0] & ROOT_MUX_MASK);
 		/* keep wakeupmix on when exit from system suspend */
 		mmio_write_32(IMX_SRC_BASE + 0xc00 + 0x14, BIT(12) | BIT(13));
 		trdc_w_reinit();
@@ -634,15 +797,15 @@ void imx_pwr_domain_suspend(const psci_power_state_t *target_state)
 		/* Enable system suspend when A55 cluster is in SUSPEND MODE */
 		mmio_setbits_32(IMX_GPC_BASE + A55C0_CMC_OFFSET + 0x800 * 2 + CM_SYS_SLEEP_CTRL, SS_SUSPEND);
 
-		/*
-		 * FIXME: Only use A55 cluster to trigger system sleep, force M33 into system sleep
-		 * this should be removed after M33 low power suspport is ready
-		 */
-		mmio_setbits_32(IMX_GPC_BASE + GPC_GLOBAL_OFFSET + GPC_SYS_SLEEP, BIT(16));
+		/* force M33 into system sleep if m33 is not enabled. */
+		if (mmio_read_32(BLK_CTRL_S_BASE + M33_CFG_OFF) & M33_CPU_WAIT_MASK)
+			mmio_setbits_32(IMX_GPC_BASE + GPC_GLOBAL_OFFSET + GPC_SYS_SLEEP, BIT(16));
 		/* put OSC into power down */
 		mmio_setbits_32(IMX_GPC_BASE + GPC_GLOBAL_OFFSET + GPC_RCOSC_CTRL, BIT(0));
 		/* put PMIC into standby mode */
 		mmio_setbits_32(IMX_GPC_BASE + GPC_GLOBAL_OFFSET + PMIC_CTRL, BIT(0));
+
+		peripheral_qchannel_hsk(true);
 
 		/* power down PLL */
 		pll_pwr_down(true);
@@ -658,14 +821,15 @@ void imx_pwr_domain_suspend_finish(const psci_power_state_t *target_state)
 	if (is_local_state_retn(SYSTEM_PWR_STATE(target_state))) {
 		/* Disable system suspend when A55 cluster is in SUSPEND MODE */
 		mmio_clrbits_32(IMX_GPC_BASE + A55C0_CMC_OFFSET + 0x800 * 2 + CM_SYS_SLEEP_CTRL, SS_SUSPEND);
-		/* FIXME: Only use A55 cluster to trigger system sleep, force CM33 into system sleep  */
-		mmio_clrbits_32(IMX_GPC_BASE + GPC_GLOBAL_OFFSET + GPC_SYS_SLEEP, BIT(16));
+		if (mmio_read_32(BLK_CTRL_S_BASE + M33_CFG_OFF) & M33_CPU_WAIT_MASK)
+			mmio_clrbits_32(IMX_GPC_BASE + GPC_GLOBAL_OFFSET + GPC_SYS_SLEEP, BIT(16));
 		/* Disable PMIC standby */
 		mmio_clrbits_32(IMX_GPC_BASE + GPC_GLOBAL_OFFSET + PMIC_CTRL, BIT(0));
 		/* Disable OSC power down */
 		mmio_clrbits_32(IMX_GPC_BASE + GPC_GLOBAL_OFFSET + GPC_RCOSC_CTRL, BIT(0));
 		/* power down PLL */
 		pll_pwr_down(false);
+		peripheral_qchannel_hsk(false);
 
 		nicmix_pwr_up(core_id);
 		wakeupmix_pwr_up();

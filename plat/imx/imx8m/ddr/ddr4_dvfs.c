@@ -154,8 +154,6 @@ void ddr4_swffc(struct dram_info *info, unsigned int pstate)
 {
 	uint32_t drate = info->timing_info->fsp_table[pstate];
 
-	/* disable auto self refresh first */
-	mmio_clrbits_32(DDRC_PWRCTL(0), BIT(0));
 	/*
 	 * 1. set SWCTL.sw_done to disable quasi-dynamic register
 	 * programming outside reset.
@@ -249,7 +247,4 @@ void ddr4_swffc(struct dram_info *info, unsigned int pstate)
 	/* wait SWSTAT.sw_done_ack to 1 */
 	while (!(mmio_read_32(DDRC_SWSTAT(0)) & 0x1))
 		;
-
-	/* enable auto self refresh after swffc done */
-	mmio_setbits_32(DDRC_PWRCTL(0), BIT(0));
 }

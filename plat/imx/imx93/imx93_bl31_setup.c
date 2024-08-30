@@ -22,6 +22,7 @@
 #include <platform_def.h>
 #include <plat_imx8.h>
 #include <trdc.h>
+#include <dram.h>
 
 static const mmap_region_t imx_mmap[] = {
 	/* APIS2 mapping */
@@ -37,7 +38,8 @@ static const mmap_region_t imx_mmap[] = {
 	MAP_REGION_FLAT(TRDC_W_BASE, TRDC_x_SISE, MT_DEVICE | MT_RW),
 	MAP_REGION_FLAT(TRDC_M_BASE, TRDC_x_SISE, MT_DEVICE | MT_RW),
 	MAP_REGION_FLAT(TRDC_N_BASE, TRDC_x_SISE, MT_DEVICE | MT_RW),
-	MAP_REGION_FLAT(S400_MU_BASE, AIPSx_SIZE, MT_DEVICE | MT_RW),
+	MAP_REGION_FLAT(FSB_BASE, 0x10000, MT_DEVICE | MT_RW),
+	MAP_REGION_FLAT(S400_MU_BASE, 0x10000, MT_DEVICE | MT_RW),
 	MAP_REGION_FLAT(DDRMIX_BASE, DDRMIX_SIZE, MT_DEVICE | MT_RW | MT_NS),
 	MAP_REGION_FLAT(GPIO_BASE, GPIO_SIZE, MT_DEVICE | MT_RW),
 	MAP_REGION_FLAT(NIC_MAIN_GPV_BASE, 0x200000, MT_DEVICE | MT_RW),
@@ -142,6 +144,9 @@ void bl31_plat_arch_setup(void)
 void bl31_platform_setup(void)
 {
 	generic_delay_timer_init();
+
+	/* Init the dram info */
+	dram_info_init(SAVED_DRAM_TIMING_BASE);
 
 	plat_gic_driver_init();
 	plat_gic_init();

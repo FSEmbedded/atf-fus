@@ -30,6 +30,7 @@
 
 #define BL31_BASE			U(0x204E0000)
 #define BL31_LIMIT			U(0x20520000)
+
 #define SAVED_DRAM_TIMING_BASE		U(0x2051c000)
 
 /* non-secure uboot base */
@@ -63,6 +64,8 @@
 #define GPIO4_BASE			U(0x43830000)
 #define GPIO_BASE			U(0x53810000)
 #define GPIO_SIZE			U(0x30000)
+#define FSB_BASE			U(0x47510000)
+#define FSB_SHADOW_OFF			U(0x8000)
 #define S400_MU_BASE			U(0x47520000)
 #define DDRMIX_BASE			U(0x4E000000)
 #define DDRMIX_SIZE			U(0x400000)
