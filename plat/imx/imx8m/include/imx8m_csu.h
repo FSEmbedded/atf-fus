@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 NXP
+ * Copyright 2020-2022 NXP
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -61,7 +61,7 @@ struct imx_csu_cfg {
 	{CSU_CSL, .idx = (i), .csl_level = (level), .lock = (lk),}
 
 #define CSU_HPx(i, val, lk)	\
-	{CSU_HP, .idx = (i), .hp = (val), .lock =(lk), }
+	{CSU_HP, .idx = (i), .hp = (val), .lock = (lk), }
 
 #define CSU_SA(i, val, lk)	\
 	{CSU_SA, .idx = (i), .sa = (val), .lock = (lk), }

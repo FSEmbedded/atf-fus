@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2018-2022, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -153,14 +153,15 @@ void bl31_early_platform_setup2(u_register_t arg0, u_register_t arg1,
 
 	imx_aipstz_init(aipstz);
 
-	imx8m_caam_init();
-
 #if DEBUG_CONSOLE
 	static console_t console;
 
 	console_imx_uart_register(IMX_BOOT_UART_BASE, IMX_BOOT_UART_CLK_IN_HZ,
 		IMX_CONSOLE_BAUDRATE, &console);
 #endif
+
+	imx8m_caam_init();
+
 	/*
 	 * tell BL3-1 where the non-secure software image is located
 	 * and the entry state information.
@@ -209,7 +210,7 @@ void bl31_plat_arch_setup(void)
 	mmap_add_region(BL_CODE_BASE, BL_CODE_BASE, (BL_CODE_END - BL_CODE_BASE),
 		MT_MEMORY | MT_RO | MT_SECURE);
 
-	// Map TEE memory
+	/* Map TEE memory */
 	mmap_add_region(BL32_BASE, BL32_BASE, BL32_SIZE, MT_MEMORY | MT_RW);
 
 	mmap_add(imx_mmap);
@@ -254,7 +255,7 @@ entry_point_info_t *bl31_plat_get_next_image_ep_info(unsigned int type)
 
 unsigned int plat_get_syscnt_freq2(void)
 {
-	return mmio_read_32(IMX_SCTR_BASE + CNTFID0_OFF);
+	return COUNTER_FREQUENCY;
 }
 
 void bl31_plat_runtime_setup(void)
@@ -263,7 +264,8 @@ void bl31_plat_runtime_setup(void)
 }
 
 #ifdef SPD_trusty
-void plat_trusty_set_boot_args(aapcs64_params_t *args) {
+void plat_trusty_set_boot_args(aapcs64_params_t *args)
+{
 	args->arg0 = BL32_SIZE;
 	args->arg1 = BL32_BASE;
 	args->arg2 = TRUSTY_PARAMS_LEN_BYTES;

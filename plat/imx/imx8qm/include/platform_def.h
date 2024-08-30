@@ -166,9 +166,6 @@
 #define MAX_MMAP_REGIONS		12
 #endif
 
-/* enable it to make debug message to SC console */
-#define SC_CONSOLE			0
-
 #ifdef SPD_trusty
 #define DEBUG_CONSOLE_A53		1
 #else

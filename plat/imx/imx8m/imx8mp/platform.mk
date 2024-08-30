@@ -1,5 +1,5 @@
 #
-# Copyright 2019-2020 NXP
+# Copyright 2019-2022 NXP
 #
 # SPDX-License-Identifier: BSD-3-Clause
 #
@@ -28,7 +28,7 @@ IMX_GIC_SOURCES		:=	${GICV3_SOURCES}			\
 
 BL31_SOURCES		+=	plat/imx/common/imx8_helpers.S			\
 				plat/imx/imx8m/gpc_common.c			\
-				plat/imx/imx8m/hab.c				\
+				plat/imx/imx8m/imx_hab.c			\
 				plat/imx/imx8m/imx_aipstz.c			\
 				plat/imx/imx8m/imx_rdc.c			\
 				plat/imx/imx8m/imx8m_caam.c			\
@@ -131,15 +131,16 @@ certificates: $(ROT_KEY)
 $(ROT_KEY): | $(BUILD_PLAT)
 	@echo "  OPENSSL $@"
 	@if [ ! -f $(ROT_KEY) ]; then \
-		openssl genrsa 2048 > $@ 2>/dev/null; \
+		${OPENSSL_BIN_PATH}/openssl genrsa 2048 > $@ 2>/dev/null; \
 	fi
 
 $(ROTPK_HASH): $(ROT_KEY)
 	@echo "  OPENSSL $@"
-	$(Q)openssl rsa -in $< -pubout -outform DER 2>/dev/null |\
-	openssl dgst -sha256 -binary > $@ 2>/dev/null
+	$(Q)${OPENSSL_BIN_PATH}/openssl rsa -in $< -pubout -outform DER 2>/dev/null |\
+	${OPENSSL_BIN_PATH}/openssl dgst -sha256 -binary > $@ 2>/dev/null
 endif
 
+ENABLE_PIE		:=	1
 USE_COHERENT_MEM	:=	1
 RESET_TO_BL31		:=	1
 A53_DISABLE_NON_TEMPORAL_HINT := 0
@@ -156,6 +157,12 @@ $(eval $(call add_define,BL32_SIZE))
 
 IMX_BOOT_UART_BASE	?=	0x30890000
 $(eval $(call add_define,IMX_BOOT_UART_BASE))
+
+EL3_EXCEPTION_HANDLING := $(SDEI_SUPPORT)
+ifeq (${SDEI_SUPPORT}, 1)
+BL31_SOURCES 		+= 	plat/imx/common/imx_ehf.c	\
+				plat/imx/common/imx_sdei.c
+endif
 
 $(eval $(call add_define,IMX8M_DDR4_DVFS))
 

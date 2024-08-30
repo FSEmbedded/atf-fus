@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 NXP
+ * Copyright 2019-2022 NXP
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -7,9 +7,10 @@
 #ifndef DRAM_H
 #define DRAM_H
 
-#include <lib/utils_def.h>
-#include <arch_helpers.h>
 #include <assert.h>
+
+#include <arch_helpers.h>
+#include <lib/utils_def.h>
 
 #include <ddrc.h>
 #include <platform_def.h>

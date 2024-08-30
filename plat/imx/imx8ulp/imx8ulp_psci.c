@@ -10,6 +10,7 @@
 #include <arch_helpers.h>
 #include <common/debug.h>
 #include <drivers/arm/gicv3.h>
+#include <drivers/delay_timer.h>
 #include <lib/mmio.h>
 #include <lib/psci/psci.h>
 
@@ -133,7 +134,7 @@ ps_apd_pwr_mode_cfgs_t apd_pwr_mode_cfgs = {
 	[DPD_PWR_MODE] = {
 		.swt_board_offs = 0x180,
 		.swt_mem_offs = 0x188,
-		.pmic_cfg = PMIC_CFG(0x23, 0xa, 0x2),
+		.pmic_cfg = PMIC_CFG(0x23, 0x0, 0x2),
 		.pad_cfg = PAD_CFG(0x0, 0xc, 0x01e80a02),
 		.bias_cfg = BIAS_CFG(0x0, 0x2, 0x2, 0x0),
 	},
@@ -142,7 +143,7 @@ ps_apd_pwr_mode_cfgs_t apd_pwr_mode_cfgs = {
 	[PD_PWR_MODE] = {
 		.swt_board_offs = 0x170,
 		.swt_mem_offs = 0x178,
-		.pmic_cfg = PMIC_CFG(0x23, 0x2, 0x2),
+		.pmic_cfg = PMIC_CFG(0x23, 0x0, 0x2),
 		.pad_cfg = PAD_CFG(0x0, 0xc, 0x01e80a00),
 		.bias_cfg = BIAS_CFG(0x0, 0x2, 0x2, 0x0),
 	},
@@ -158,7 +159,7 @@ ps_apd_pwr_mode_cfgs_t apd_pwr_mode_cfgs = {
 	[ACT_PWR_MODE] = {
 		.swt_board_offs = 0x110,
 		.swt_mem_offs = 0x118,
-		.pmic_cfg = PMIC_CFG(0x23, 0x2, 0x2),
+		.pmic_cfg = PMIC_CFG(0x23, 0x0, 0x2),
 		.pad_cfg = PAD_CFG(0x0, 0x0, 0x0deb7a00),
 		.bias_cfg = BIAS_CFG(0x2, 0x2, 0x2, 0x0),
 	},
@@ -396,6 +397,12 @@ void imx_domain_suspend_finish(const psci_power_state_t *target_state)
 	while (mmio_read_32(DRAM_LPM_STATUS) != 0) {
 		;
 	}
+
+	/*
+	 * when resume from low power mode, need to delay for a while
+	 * before access the CMC register.
+	 */
+	udelay(5);
 
 	/* clear cluster's LPM setting. */
 	mmio_write_32(IMX_CMC1_BASE + 0x20, 0x0);

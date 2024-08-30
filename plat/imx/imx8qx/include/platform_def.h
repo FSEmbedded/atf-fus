@@ -86,9 +86,6 @@
 /* non-secure u-boot base */
 #define PLAT_NS_IMAGE_OFFSET		0x80020000
 
-/* enable it to make debug message to SC console */
-#define SC_CONSOLE			0
-
 #ifdef SPD_trusty
 #define DEBUG_CONSOLE_A35		1
 #else

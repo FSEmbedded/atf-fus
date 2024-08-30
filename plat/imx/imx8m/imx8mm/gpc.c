@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2019-2022, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -37,6 +37,7 @@ enum pu_domain_id {
 	/* below two domain only for ATF internal use */
 	GPU2D,
 	GPU3D,
+	MAX_DOMAINS,
 };
 
 /* PU domain */
@@ -63,7 +64,7 @@ static unsigned int pu_domain_status;
 #define VPU_RCR		0x44
 
 #define VPU_CTL_BASE		0x38330000
-#define BLK_SFT_RSTN_CSR 	0x0
+#define BLK_SFT_RSTN_CSR	0x0
 #define H1_SFT_RSTN		BIT(2)
 #define G1_SFT_RSTN		BIT(1)
 #define G2_SFT_RSTN		BIT(0)
@@ -76,7 +77,7 @@ void vpu_sft_reset_assert(uint32_t domain_id)
 
 	val = mmio_read_32(VPU_CTL_BASE + BLK_SFT_RSTN_CSR);
 
-	switch(domain_id) {
+	switch (domain_id) {
 	case VPU_G1:
 		val &= ~G1_SFT_RSTN;
 		mmio_write_32(VPU_CTL_BASE + BLK_SFT_RSTN_CSR, val);
@@ -100,7 +101,7 @@ void vpu_sft_reset_deassert(uint32_t domain_id)
 
 	val = mmio_read_32(VPU_CTL_BASE + BLK_SFT_RSTN_CSR);
 
-	switch(domain_id) {
+	switch (domain_id) {
 	case VPU_G1:
 		val |= G1_SFT_RSTN;
 		mmio_write_32(VPU_CTL_BASE + BLK_SFT_RSTN_CSR, val);
@@ -120,19 +121,19 @@ void vpu_sft_reset_deassert(uint32_t domain_id)
 
 void imx_gpc_pm_domain_enable(uint32_t domain_id, bool on)
 {
-	struct imx_pwr_domain *pwr_domain;
-
-	if (domain_id >= ARRAY_SIZE(pu_domains))
+	if (domain_id >= MAX_DOMAINS) {
 		return;
+	}
 
-	pwr_domain = &pu_domains[domain_id];
+	struct imx_pwr_domain *pwr_domain = &pu_domains[domain_id];
 
 	if (on) {
 		pu_domain_status |= (1 << domain_id);
 
 		if (domain_id == VPU_G1 || domain_id == VPU_G2 ||
-		    domain_id == VPU_H1)
+		    domain_id == VPU_H1) {
 			vpu_sft_reset_assert(domain_id);
+		}
 
 		/* HSIOMIX has no PU bit, so skip for it */
 		if (domain_id != HSIOMIX) {
@@ -143,8 +144,9 @@ void imx_gpc_pm_domain_enable(uint32_t domain_id, bool on)
 			mmio_setbits_32(IMX_GPC_BASE + PU_PGC_UP_TRG, pwr_domain->pwr_req);
 
 			/* wait for power request done */
-			while (mmio_read_32(IMX_GPC_BASE + PU_PGC_UP_TRG) & pwr_domain->pwr_req)
+			while (mmio_read_32(IMX_GPC_BASE + PU_PGC_UP_TRG) & pwr_domain->pwr_req) {
 				;
+			}
 		}
 
 		if (domain_id == VPU_G1 || domain_id == VPU_G2 ||
@@ -164,8 +166,9 @@ void imx_gpc_pm_domain_enable(uint32_t domain_id, bool on)
 			mmio_setbits_32(IMX_GPC_BASE + PU_PGC_UP_TRG, GPU2D_PWR_REQ);
 
 			/* wait for power request done */
-			while (mmio_read_32(IMX_GPC_BASE + PU_PGC_UP_TRG) & GPU2D_PWR_REQ)
+			while (mmio_read_32(IMX_GPC_BASE + PU_PGC_UP_TRG) & GPU2D_PWR_REQ) {
 				;
+			}
 
 			udelay(1);
 
@@ -175,8 +178,9 @@ void imx_gpc_pm_domain_enable(uint32_t domain_id, bool on)
 			mmio_setbits_32(IMX_GPC_BASE + PU_PGC_UP_TRG, GPU3D_PWR_REQ);
 
 			/* wait for power request done */
-			while (mmio_read_32(IMX_GPC_BASE + PU_PGC_UP_TRG) & GPU3D_PWR_REQ)
+			while (mmio_read_32(IMX_GPC_BASE + PU_PGC_UP_TRG) & GPU3D_PWR_REQ) {
 				;
+			}
 
 			udelay(10);
 			/* release the gpumix reset */
@@ -208,8 +212,9 @@ void imx_gpc_pm_domain_enable(uint32_t domain_id, bool on)
 			mmio_setbits_32(IMX_GPC_BASE + GPC_PU_PWRHSK, pwr_domain->adb400_sync);
 
 			/* wait for adb power request ack */
-			while (!(mmio_read_32(IMX_GPC_BASE + GPC_PU_PWRHSK) & pwr_domain->adb400_ack))
+			while (!(mmio_read_32(IMX_GPC_BASE + GPC_PU_PWRHSK) & pwr_domain->adb400_ack)) {
 				;
+			}
 		}
 
 		if (domain_id == GPUMIX) {
@@ -217,35 +222,40 @@ void imx_gpc_pm_domain_enable(uint32_t domain_id, bool on)
 			mmio_setbits_32(IMX_GPC_BASE + GPC_PU_PWRHSK, GPU2D_ADB400_SYNC);
 
 			/* wait for adb power request ack */
-			while (!(mmio_read_32(IMX_GPC_BASE + GPC_PU_PWRHSK) & GPU2D_ADB400_ACK))
-					;
+			while (!(mmio_read_32(IMX_GPC_BASE + GPC_PU_PWRHSK) & GPU2D_ADB400_ACK)) {
+				;
+			}
 
 			/* power up GPU3D ADB */
 			mmio_setbits_32(IMX_GPC_BASE + GPC_PU_PWRHSK, GPU3D_ADB400_SYNC);
 
 			/* wait for adb power request ack */
-			while (!(mmio_read_32(IMX_GPC_BASE + GPC_PU_PWRHSK) & GPU3D_ADB400_ACK))
-					;
+			while (!(mmio_read_32(IMX_GPC_BASE + GPC_PU_PWRHSK) & GPU3D_ADB400_ACK)) {
+				;
+			}
 		}
 	} else {
 		pu_domain_status &= ~(1 << domain_id);
 
-		if (domain_id == OTG1 || domain_id == OTG2)
+		if (domain_id == OTG1 || domain_id == OTG2) {
 			return;
+		}
 
 		/* GPU2D & GPU3D ADB power down */
 		if (domain_id == GPUMIX) {
 			mmio_clrbits_32(IMX_GPC_BASE + GPC_PU_PWRHSK, GPU2D_ADB400_SYNC);
 
 			/* wait for adb power request ack */
-			while ((mmio_read_32(IMX_GPC_BASE + GPC_PU_PWRHSK) & GPU2D_ADB400_ACK))
-					;
+			while ((mmio_read_32(IMX_GPC_BASE + GPC_PU_PWRHSK) & GPU2D_ADB400_ACK)) {
+				;
+			}
 
 			mmio_clrbits_32(IMX_GPC_BASE + GPC_PU_PWRHSK, GPU3D_ADB400_SYNC);
 
 				/* wait for adb power request ack */
-			while ((mmio_read_32(IMX_GPC_BASE + GPC_PU_PWRHSK) & GPU3D_ADB400_ACK))
-					;
+			while ((mmio_read_32(IMX_GPC_BASE + GPC_PU_PWRHSK) & GPU3D_ADB400_ACK)) {
+				;
+			}
 		}
 
 		/* handle the ADB400 sync */
@@ -254,8 +264,9 @@ void imx_gpc_pm_domain_enable(uint32_t domain_id, bool on)
 			mmio_clrbits_32(IMX_GPC_BASE + GPC_PU_PWRHSK, pwr_domain->adb400_sync);
 
 			/* wait for adb power request ack */
-			while ((mmio_read_32(IMX_GPC_BASE + GPC_PU_PWRHSK) & pwr_domain->adb400_ack))
+			while ((mmio_read_32(IMX_GPC_BASE + GPC_PU_PWRHSK) & pwr_domain->adb400_ack)) {
 				;
+			}
 		}
 
 		if (domain_id == GPUMIX) {
@@ -265,7 +276,9 @@ void imx_gpc_pm_domain_enable(uint32_t domain_id, bool on)
 			mmio_setbits_32(IMX_GPC_BASE + PU_PGC_DN_TRG, GPU2D_PWR_REQ);
 
 			/* wait for power request done */
-			while (mmio_read_32(IMX_GPC_BASE + PU_PGC_DN_TRG) & GPU2D_PWR_REQ);
+			while (mmio_read_32(IMX_GPC_BASE + PU_PGC_DN_TRG) & GPU2D_PWR_REQ) {
+				;
+			}
 
 			/* power down GPU3D */
 			mmio_setbits_32(IMX_GPC_BASE + GPU3D_PGC, 0x1);
@@ -273,8 +286,9 @@ void imx_gpc_pm_domain_enable(uint32_t domain_id, bool on)
 			mmio_setbits_32(IMX_GPC_BASE + PU_PGC_DN_TRG, GPU3D_PWR_REQ);
 
 			/* wait for power request done */
-			while (mmio_read_32(IMX_GPC_BASE + PU_PGC_DN_TRG) & GPU3D_PWR_REQ)
+			while (mmio_read_32(IMX_GPC_BASE + PU_PGC_DN_TRG) & GPU3D_PWR_REQ) {
 				;
+			}
 		}
 
 		/* HSIOMIX has no PU bit, so skip for it */
@@ -286,8 +300,9 @@ void imx_gpc_pm_domain_enable(uint32_t domain_id, bool on)
 			mmio_setbits_32(IMX_GPC_BASE + PU_PGC_DN_TRG, pwr_domain->pwr_req);
 
 			/* wait for power request done */
-			while (mmio_read_32(IMX_GPC_BASE + PU_PGC_DN_TRG) & pwr_domain->pwr_req)
+			while (mmio_read_32(IMX_GPC_BASE + PU_PGC_DN_TRG) & pwr_domain->pwr_req) {
 				;
+			}
 		}
 	}
 }

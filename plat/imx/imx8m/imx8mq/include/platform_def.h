@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2018-2022, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -147,13 +147,11 @@
 #define OCRAM_S_SIZE			U(0x8000)
 #define OCRAM_S_LIMIT			(OCRAM_S_BASE + OCRAM_S_SIZE)
 
+#define COUNTER_FREQUENCY		8333333 /* 25MHz / 3 */
 #define IMX_SEPARATE_NOBITS_BASE 	OCRAM_S_BASE
 #define IMX_SEPARATE_NOBITS_LIMIT	OCRAM_S_LIMIT
-
-#define IMX_SCTR_BASE			0x306c0000
-#define CNTFID0_OFF			U(0x20)
-#define CNTFID1_OFF			U(0x24)
-#define COUNTER_FREQUENCY		8000000 /* 8MHz */
+#define IMX_SEPARATE_COHERENT_MEM_BASE  U(0x90E000)
+#define IMX_SEPARATE_COHERENT_MEM_LIMIT U(0x90F000)
 
 #define DEBUG_CONSOLE			0
 

@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2019-2020, ARM Limited and Contributors. All rights reserved.
+# Copyright (c) 2019-2022, ARM Limited and Contributors. All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
 #
@@ -11,10 +11,13 @@ PLAT_INCLUDES		:=	-Iplat/imx/common/include		\
 				-Iplat/imx/imx8m/include		\
 				-Iplat/imx/imx8m/imx8mm/include		\
 				-Idrivers/imx/usdhc			\
-				-Iinclude/common/tbbr
+				-Iinclude/common/tbbr			\
+				-Iinclude/lib/libfdt
 
 # Include GICv3 driver files
 include drivers/arm/gic/v3/gicv3.mk
+
+include lib/libfdt/libfdt.mk
 
 IMX_DRAM_SOURCES	:=	plat/imx/imx8m/ddr/dram.c		\
 				plat/imx/imx8m/ddr/clock.c		\
@@ -29,7 +32,7 @@ IMX_GIC_SOURCES		:=	${GICV3_SOURCES}			\
 
 BL31_SOURCES		+=	plat/imx/common/imx8_helpers.S			\
 				plat/imx/imx8m/gpc_common.c			\
-				plat/imx/imx8m/hab.c				\
+				plat/imx/imx8m/imx_hab.c			\
 				plat/imx/imx8m/imx_aipstz.c			\
 				plat/imx/imx8m/imx_rdc.c			\
 				plat/imx/imx8m/imx8m_csu.c			\
@@ -53,6 +56,7 @@ BL31_SOURCES		+=	plat/imx/common/imx8_helpers.S			\
 
 ifeq (${NEED_BL2},yes)
 BL2_SOURCES		+=	common/desc_image_load.c			\
+				common/fdt_wrappers.c				\
 				plat/imx/common/imx8_helpers.S			\
 				plat/imx/common/imx_uart_console.S		\
 				plat/imx/imx8m/imx8mm/imx8mm_bl2_el3_setup.c	\
@@ -130,15 +134,16 @@ certificates: $(ROT_KEY)
 $(ROT_KEY): | $(BUILD_PLAT)
 	@echo "  OPENSSL $@"
 	@if [ ! -f $(ROT_KEY) ]; then \
-		openssl genrsa 2048 > $@ 2>/dev/null; \
+		${OPENSSL_BIN_PATH}/openssl genrsa 2048 > $@ 2>/dev/null; \
 	fi
 
 $(ROTPK_HASH): $(ROT_KEY)
 	@echo "  OPENSSL $@"
-	$(Q)openssl rsa -in $< -pubout -outform DER 2>/dev/null |\
-	openssl dgst -sha256 -binary > $@ 2>/dev/null
+	$(Q)${OPENSSL_BIN_PATH}/openssl rsa -in $< -pubout -outform DER 2>/dev/null |\
+	${OPENSSL_BIN_PATH}/openssl dgst -sha256 -binary > $@ 2>/dev/null
 endif
 
+ENABLE_PIE		:=	1
 USE_COHERENT_MEM	:=	1
 RESET_TO_BL31		:=	1
 A53_DISABLE_NON_TEMPORAL_HINT := 0
@@ -155,6 +160,26 @@ $(eval $(call add_define,BL32_SIZE))
 
 IMX_BOOT_UART_BASE	?=	0x30890000
 $(eval $(call add_define,IMX_BOOT_UART_BASE))
+
+EL3_EXCEPTION_HANDLING := $(SDEI_SUPPORT)
+ifeq (${SDEI_SUPPORT}, 1)
+BL31_SOURCES 		+= 	plat/imx/common/imx_ehf.c	\
+				plat/imx/common/imx_sdei.c
+endif
+
+ifeq (${MEASURED_BOOT},1)
+    MEASURED_BOOT_MK := drivers/measured_boot/event_log/event_log.mk
+    $(info Including ${MEASURED_BOOT_MK})
+    include ${MEASURED_BOOT_MK}
+
+ifneq (${MBOOT_EL_HASH_ALG}, sha256)
+    $(eval $(call add_define,TF_MBEDTLS_MBOOT_USE_SHA512))
+endif
+
+BL2_SOURCES		+=	plat/imx/imx8m/imx8m_measured_boot.c	\
+				plat/imx/imx8m/imx8m_dyn_cfg_helpers.c	\
+				${EVENT_LOG_SOURCES}
+endif
 
 $(eval $(call add_define,IMX8M_DDR4_DVFS))
 

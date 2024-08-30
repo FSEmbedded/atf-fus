@@ -111,9 +111,6 @@ static struct trusty_shmem_client_state trusty_shmem_client_state[2] = {
 	[true].secure = true,
 	[true].identity_mapped = true,
 	[true].receiver = true,
-#if defined(PLAT_imx8mm) || defined(PLAT_imx8mn) || defined(PLAT_imx8mp)
-	[false].identity_mapped = true,
-#endif
 };
 
 /**
@@ -1013,7 +1010,7 @@ static int to_spi_err(long ret)
 /*
  * trusty_shared_memory_smc - SMC call handler.
  */
-uintptr_t spmd_smc_handler(uint32_t smc_fid,
+uintptr_t spmd_ffa_smc_handler(uint32_t smc_fid,
 			   u_register_t x1,
 			   u_register_t x2,
 			   u_register_t x3,

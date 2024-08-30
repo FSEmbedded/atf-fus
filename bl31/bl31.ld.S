@@ -29,6 +29,10 @@ MEMORY {
 #if IMX_SEPARATE_XLAT_TABLE
     RAM_S (rwx): ORIGIN = IMX_SEPARATE_NOBITS_BASE, LENGTH = IMX_SEPARATE_NOBITS_LIMIT - IMX_SEPARATE_NOBITS_BASE
 #endif
+
+#if IMX_SEPARATE_COHERENT_MEM
+    RAM_COHEREN (rwx): ORIGIN = IMX_SEPARATE_COHERENT_MEM_BASE, LENGTH = IMX_SEPARATE_COHERENT_MEM_LIMIT - IMX_SEPARATE_COHERENT_MEM_BASE
+#endif
 }
 
 #ifdef PLAT_EXTRA_LD_SCRIPT
@@ -56,6 +60,10 @@ SECTIONS
     .rodata . : {
         __RODATA_START__ = .;
         *(SORT_BY_ALIGNMENT(.rodata*))
+
+#if PLAT_EXTRA_RODATA_INCLUDES
+#include <plat.ld.rodata.inc>
+#endif
 
 	RODATA_COMMON
 
@@ -205,7 +213,11 @@ SECTIONS
          */
         . = ALIGN(PAGE_SIZE);
         __COHERENT_RAM_END__ = .;
+#if IMX_SEPARATE_COHERENT_MEM
+    } >RAM_COHEREN
+#else
     } >NOBITS
+#endif
 #endif
 
 #if SEPARATE_NOBITS_REGION
@@ -226,12 +238,13 @@ SECTIONS
 #endif
     __BL31_END__ = .;
 
+    ASSERT(. <= BL31_LIMIT, "BL31 image has exceeded its limit.")
+#endif
+
     /DISCARD/ : {
         *(.dynsym .dynstr .hash .gnu.hash)
     }
 
-    ASSERT(. <= BL31_LIMIT, "BL31 image has exceeded its limit.")
-#endif
 
 #if IMX_SEPARATE_XLAT_TABLE
     . = IMX_SEPARATE_NOBITS_BASE;

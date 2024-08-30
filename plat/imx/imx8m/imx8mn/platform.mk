@@ -1,5 +1,5 @@
 #
-# Copyright 2019-2020 NXP
+# Copyright 2019-2022 NXP
 #
 # SPDX-License-Identifier: BSD-3-Clause
 #
@@ -27,7 +27,7 @@ IMX_GIC_SOURCES		:=	${GICV3_SOURCES}			\
 
 BL31_SOURCES		+=	plat/imx/common/imx8_helpers.S			\
 				plat/imx/imx8m/gpc_common.c			\
-				plat/imx/imx8m/hab.c				\
+				plat/imx/imx8m/imx_hab.c			\
 				plat/imx/imx8m/imx_aipstz.c			\
 				plat/imx/imx8m/imx_rdc.c			\
 				plat/imx/imx8m/imx8m_caam.c			\
@@ -49,6 +49,7 @@ BL31_SOURCES		+=	plat/imx/common/imx8_helpers.S			\
 				${IMX_GIC_SOURCES}				\
 				${XLAT_TABLES_LIB_SRCS}
 
+ENABLE_PIE		:=	1
 USE_COHERENT_MEM	:=	1
 RESET_TO_BL31		:=	1
 A53_DISABLE_NON_TEMPORAL_HINT := 0
@@ -65,6 +66,12 @@ $(eval $(call add_define,BL32_SIZE))
 
 IMX_BOOT_UART_BASE	?=	0x30890000
 $(eval $(call add_define,IMX_BOOT_UART_BASE))
+
+EL3_EXCEPTION_HANDLING := $(SDEI_SUPPORT)
+ifeq (${SDEI_SUPPORT}, 1)
+BL31_SOURCES 		+= 	plat/imx/common/imx_ehf.c	\
+				plat/imx/common/imx_sdei.c
+endif
 
 $(eval $(call add_define,IMX8M_DDR4_DVFS))
 

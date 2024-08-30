@@ -496,7 +496,8 @@ void imx_gpc_init(void)
 	mmio_clrbits_32(IMX_SRC_BASE + SRC_OTG1PHY_SCR, 0x1);
 	mmio_clrbits_32(IMX_SRC_BASE + SRC_OTG2PHY_SCR, 0x1);
 
-	/* for USB OTG, the limitation are:
+	/*
+	 * for USB OTG, the limitation are:
 	 * 1. before system clock config, the IPG clock run at 12.5MHz, delay time
 	 *    should be longer than 82us.
 	 * 2. after system clock config, ipg clock run at 66.5MHz, delay time

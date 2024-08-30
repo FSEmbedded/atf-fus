@@ -304,13 +304,3 @@ int imx_hifi_xrdc(uint32_t smc_fid)
 	return 0;
 }
 #endif
-
-#if SC_CONSOLE
-int putchar(int c)
-{
-	if (ipc_handle)
-		sc_misc_debug_out(ipc_handle, (unsigned char)c);
-
-	return c;
-}
-#endif

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2018-2022, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -19,6 +19,8 @@
 #include <imx_sip_svc.h>
 #include <plat_imx8.h>
 #include <imx_rdc.h>
+
+#define MAX_PLL_NUM	U(10)
 
 static uint32_t gpc_imr_offset[] = { IMR1_CORE0_A53, IMR1_CORE1_A53, IMR1_CORE2_A53, IMR1_CORE3_A53, };
 
@@ -307,8 +309,6 @@ void imx_clear_rbc_count(void)
 		(0x3f << SLPCR_RBC_COUNT_SHIFT));
 }
 
-#define MAX_PLL_NUM	10
-
 struct pll_override pll[MAX_PLL_NUM] = {
 	{.reg = 0x0, .override_mask = (1 << 12) | (1 << 8), },
 	{.reg = 0x14, .override_mask = (1 << 12) | (1 << 8), },
@@ -327,13 +327,13 @@ struct pll_override pll[MAX_PLL_NUM] = {
 #pragma weak imx_anamix_override
 void imx_anamix_override(bool enter)
 {
-	int i;
+	unsigned int i;
 
 	/*
 	 * bypass all the plls & enable the override bit before
 	 * entering DSM mode.
 	 */
-	for (i = 0; i < MAX_PLL_NUM; i++) {
+	for (i = 0U; i < MAX_PLL_NUM; i++) {
 		if (enter) {
 			mmio_setbits_32(IMX_ANAMIX_BASE + pll[i].reg, PLL_BYPASS);
 			mmio_setbits_32(IMX_ANAMIX_BASE + pll[i].reg, pll[i].override_mask);
@@ -347,7 +347,7 @@ void imx_anamix_override(bool enter)
 #pragma weak imx_gpc_handler
 int imx_gpc_handler(uint32_t smc_fid, u_register_t x1, u_register_t x2, u_register_t x3)
 {
-	switch(x1) {
+	switch (x1) {
 	case FSL_SIP_CONFIG_GPC_PM_DOMAIN:
 		imx_gpc_pm_domain_enable(x2, x3);
 		break;

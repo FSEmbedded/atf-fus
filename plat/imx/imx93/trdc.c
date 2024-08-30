@@ -12,6 +12,7 @@
 #include <common/debug.h>
 #include <lib/mmio.h>
 
+#include <platform_def.h>
 #include "trdc_config.h"
 
 #define DID_NUM 16

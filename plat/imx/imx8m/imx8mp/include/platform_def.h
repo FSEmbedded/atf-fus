@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 NXP
+ * Copyright 2020-2022 NXP
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -9,6 +9,7 @@
 #include <common/tbbr/tbbr_img_def.h>
 #include <lib/utils_def.h>
 #include <lib/xlat_tables/xlat_tables_v2.h>
+#include <plat/common/common_def.h>
 
 #define PLATFORM_LINKER_FORMAT		"elf64-littleaarch64"
 #define PLATFORM_LINKER_ARCH		aarch64
@@ -36,10 +37,10 @@
 #define PLAT_STOP_OFF_STATE		U(3)
 
 #if defined(NEED_BL2)
-#define BL2_BASE			U(0x960000)
-#define BL2_LIMIT			U(0x980000)
-#define BL31_BASE			U(0x940000)
-#define BL31_LIMIT			U(0x960000)
+#define BL2_BASE			U(0x970000)
+#define BL2_SIZE			SZ_128K
+#define BL2_LIMIT			(BL2_BASE + BL2_SIZE)
+#define BL31_BASE			U(0x950000)
 #define IMX_FIP_BASE			U(0x40310000)
 #define IMX_FIP_SIZE			U(0x000300000)
 #define IMX_FIP_LIMIT			U(FIP_BASE + FIP_SIZE)
@@ -50,8 +51,10 @@
 #define PLAT_IMX8MP_BOOT_MMC_BASE	U(0x30B50000) /* SD */
 #else
 #define BL31_BASE			U(0x970000)
-#define BL31_LIMIT			U(0x990000)
 #endif
+
+#define BL31_SIZE			SZ_128K
+#define BL31_LIMIT			(BL31_BASE + BL31_SIZE)
 
 #define PLAT_PRI_BITS			U(3)
 #define PLAT_SDEI_CRITICAL_PRI		0x10
@@ -211,6 +214,13 @@
 #define CAAM_RAM_MAP	MAP_REGION_FLAT(IMX_CAAM_RAM_BASE, IMX_CAAM_RAM_SIZE, MT_MEMORY | MT_RW) /* CAMM RAM */
 #define NS_OCRAM_MAP	MAP_REGION_FLAT(IMX_NS_OCRAM_BASE, IMX_NS_OCRAM_SIZE, MT_MEMORY | MT_RW) /* NS OCRAM */
 #define ROM_MAP		MAP_REGION_FLAT(IMX_ROM_BASE, IMX_ROM_SIZE, MT_MEMORY | MT_RO) /* ROM code */
+
+/*
+ * Note: DRAM region is mapped with entire size available and uses MT_RW
+ * attributes.
+ * See details in docs/plat/imx8m.rst "High Assurance Boot (HABv4)" section
+ * for explanation of this mapping scheme.
+ */
 #define DRAM_MAP	MAP_REGION_FLAT(IMX_DRAM_BASE, IMX_DRAM_SIZE, MT_MEMORY | MT_RW | MT_NS) /* DRAM */
 #define DRAM2_MAP	MAP_REGION_FLAT(IMX_DRAM2_BASE, IMX_DRAM2_SIZE, MT_MEMORY | MT_RW | MT_NS) /* DRAM2 */
 #define VPU_BLK_CTL_MAP	MAP_REGION_FLAT(IMX_VPU_BLK_BASE, IMX_VPU_BLK_SIZE, MT_DEVICE | MT_RW) /* VPU BLK CTL */
