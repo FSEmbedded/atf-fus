@@ -34,6 +34,7 @@ BL31_SOURCES		+=	plat/common/aarch64/crash_console_helpers.S   \
 				plat/imx/imx93/trdc.c			\
 				plat/imx/imx93/pwr_ctrl.c			\
 				plat/imx/imx93/imx93_bl31_setup.c		\
+				plat/imx/imx93/imx93_ccm.c		\
 				plat/imx/imx93/imx93_psci.c			\
 				plat/imx/imx93/src.c			\
 				plat/imx/common/imx_sip_svc.c			\
