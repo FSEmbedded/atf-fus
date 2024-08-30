@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2022, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2018-2023, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -44,6 +44,10 @@ struct plat_gic_ctx imx_gicv3_ctx;
 #pragma weak imx_set_cpu_pwr_on
 #pragma weak imx_set_cpu_lpm
 #pragma weak imx_set_cluster_powerdown
+#pragma weak imx_set_sys_wakeup
+#pragma weak imx_noc_slot_config
+#pragma weak imx_gpc_handler
+#pragma weak imx_anamix_override
 
 #if defined(LPA_ENABLE)
 bool imx_m4_lpa_active(void)
@@ -131,7 +135,7 @@ void imx_set_cpu_lpm(unsigned int core_id, bool pdn)
 		/* assert the pcg pcr bit of the core */
 		mmio_setbits_32(IMX_GPC_BASE + COREx_PGC_PCR(core_id), 0x1);
 	} else {
-		/* disbale CORE WFI PDN & IRQ PUP */
+		/* disable CORE WFI PDN & IRQ PUP */
 		mmio_clrbits_32(IMX_GPC_BASE + LPCR_A53_AD, COREx_WFI_PDN(core_id) |
 				COREx_IRQ_WUP(core_id));
 		/* deassert the pcg pcr bit of the core */
@@ -181,7 +185,7 @@ void imx_set_cluster_powerdown(unsigned int last_core, uint8_t power_state)
 {
 	uint32_t val;
 
-	if (!is_local_state_run(power_state)) {
+	if (is_local_state_off(power_state)) {
 		/* config C0~1's LPM, enable a53 clock off in LPM */
 		mmio_clrsetbits_32(IMX_GPC_BASE + LPCR_A53_BSC, A53_CLK_ON_LPM,
 			LPM_MODE(power_state));
@@ -218,7 +222,6 @@ static unsigned int gicd_read_isenabler(uintptr_t base, unsigned int id)
 	return mmio_read_32(base + GICD_ISENABLER + (n << 2));
 }
 
-#pragma weak imx_set_sys_wakeup
 /*
  * gic's clock will be gated in system suspend, so gic has no ability to
  * to wakeup the system, we need to config the imr based on the irq
@@ -323,8 +326,6 @@ struct pll_override pll[MAX_PLL_NUM] = {
 };
 
 #define PLL_BYPASS	BIT(4)
-
-#pragma weak imx_anamix_override
 void imx_anamix_override(bool enter)
 {
 	unsigned int i;
@@ -344,7 +345,6 @@ void imx_anamix_override(bool enter)
 	}
 }
 
-#pragma weak imx_gpc_handler
 int imx_gpc_handler(uint32_t smc_fid, u_register_t x1, u_register_t x2, u_register_t x3)
 {
 	switch (x1) {

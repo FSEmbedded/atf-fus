@@ -27,6 +27,7 @@
 #include <imx_uart.h>
 #include <imx_rdc.h>
 #include <imx8m_caam.h>
+#include <imx8m_ccm.h>
 #include <imx8m_csu.h>
 #include <imx8m_snvs.h>
 #include <plat_imx8.h>
@@ -189,6 +190,7 @@ static void bl31_tzc380_setup(void)
 void bl31_early_platform_setup2(u_register_t arg0, u_register_t arg1,
 		u_register_t arg2, u_register_t arg3)
 {
+	unsigned int console_base = IMX_BOOT_UART_BASE;
 	static console_t console;
 	int i;
 
@@ -203,7 +205,11 @@ void bl31_early_platform_setup2(u_register_t arg0, u_register_t arg1,
 
 	imx_csu_init(csu_cfg);
 
-	console_imx_uart_register(IMX_BOOT_UART_BASE, IMX_BOOT_UART_CLK_IN_HZ,
+	if (console_base == 0U) {
+		console_base = imx8m_uart_get_base();
+	}
+
+	console_imx_uart_register(console_base, IMX_BOOT_UART_CLK_IN_HZ,
 		IMX_CONSOLE_BAUDRATE, &console);
 	/* This console is only used for boot stage */
 	console_set_scope(&console, CONSOLE_FLAG_BOOT);
@@ -269,8 +275,10 @@ void bl31_plat_arch_setup(void)
 #if USE_COHERENT_MEM
 		MAP_COHERENT_MEM,
 #endif
+#if defined(SPD_opteed) || defined(SPD_trusty)
 		/* Map TEE memory */
 		MAP_BL32_TOTAL,
+#endif
 		{0}
 	};
 

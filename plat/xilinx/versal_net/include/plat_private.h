@@ -1,7 +1,7 @@
 /*
- * Copyright (c) 2018-2019, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2018-2019, Arm Limited and Contributors. All rights reserved.
  * Copyright (c) 2021-2022, Xilinx, Inc. All rights reserved.
- * Copyright (C) 2022, Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -18,8 +18,9 @@ typedef struct versal_intr_info_type_el3 {
 } versal_intr_info_type_el3_t;
 
 void versal_net_config_setup(void);
+uint32_t get_uart_clk(void);
 
-const mmap_region_t *plat_versal_net_get_mmap(void);
+const mmap_region_t *plat_get_mmap(void);
 
 void plat_versal_net_gic_driver_init(void);
 void plat_versal_net_gic_init(void);
@@ -42,8 +43,5 @@ int32_t sip_svc_setup_init(void);
  * for INTR_TYPE_EL3 type of interrupt
  */
 int request_intr_type_el3(uint32_t irq, interrupt_type_handler_t fiq_handler);
-
-#define PM_GET_CHIPID			(24U)
-#define IOCTL_OSPI_MUX_SELECT		(21U)
 
 #endif /* PLAT_PRIVATE_H */

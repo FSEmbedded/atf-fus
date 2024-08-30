@@ -32,11 +32,11 @@ static inline void bypass_smmu(uintptr_t smmu_base_addr)
 
 static inline void smmu_cache_unlock(uintptr_t smmu_base_addr)
 {
-    uint32_t val;
+	uint32_t val;
 
-    val = mmio_read_32((smmu_base_addr + SMMU_SACR));
-    val &= (uint32_t)~SMMU_SACR_CACHE_LOCK_ENABLE_BIT;
-    mmio_write_32((smmu_base_addr + SMMU_SACR), val);
+	val = mmio_read_32((smmu_base_addr + SMMU_SACR));
+	val &= (uint32_t)~SMMU_SACR_CACHE_LOCK_ENABLE_BIT;
+	mmio_write_32((smmu_base_addr + SMMU_SACR), val);
 }
 
 #endif

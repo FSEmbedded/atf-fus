@@ -123,6 +123,7 @@ struct jobring_regs {
 
  /* RNG RDSTA bitmask */
 #define RNG_STATE0_HANDLE_INSTANTIATED	0x00000001
+#define RNG_STATE1_HANDLE_INSTANTIATED	0x00000002
 #define RTMCTL_PRGM 0x00010000	/* 1 -> program mode, 0 -> run mode */
  /* use von Neumann data in both entropy shifter and statistical checker */
 #define RTMCTL_SAMP_MODE_VON_NEUMANN_ES_SC	 0
@@ -221,7 +222,7 @@ typedef struct {
  /*  Lists the possible states for a job ring. */
 typedef enum sec_job_ring_state_e {
 	SEC_JOB_RING_STATE_STARTED,	/* Job ring is initialized */
-	SEC_JOB_RING_STATE_RESET,	/* Job ring reset is in progres */
+	SEC_JOB_RING_STATE_RESET,	/* Job ring reset is in progress */
 } sec_job_ring_state_t;
 
 struct sec_job_ring_t {

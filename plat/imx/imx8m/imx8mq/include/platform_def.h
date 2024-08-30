@@ -5,6 +5,7 @@
  */
 
 #include <lib/utils_def.h>
+#include <plat/common/common_def.h>
 
 #define PLATFORM_LINKER_FORMAT		"elf64-littleaarch64"
 #define PLATFORM_LINKER_ARCH		aarch64
@@ -33,7 +34,8 @@
 #define PLAT_STOP_OFF_STATE		U(3)
 
 #define BL31_BASE			U(0x910000)
-#define BL31_LIMIT			U(0x920000)
+#define BL31_SIZE			SZ_64K
+#define BL31_LIMIT			(BL31_BASE + BL31_SIZE)
 
 /* non-secure uboot base */
 #define PLAT_NS_IMAGE_OFFSET		U(0x40200000)
@@ -132,7 +134,7 @@
 #define SNVS_LPCR_DP_EN			BIT(5)
 #define SNVS_LPCR_TOP			BIT(6)
 
-#define SAVED_DRAM_TIMING_BASE		0x40000000
+#define SAVED_DRAM_TIMING_BASE		U(0x40000000)
 
 #define HW_DRAM_PLL_CFG0		(IMX_ANAMIX_BASE + 0x60)
 #define HW_DRAM_PLL_CFG1		(IMX_ANAMIX_BASE + 0x64)

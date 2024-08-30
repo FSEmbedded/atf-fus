@@ -124,7 +124,7 @@ static void fspi_op_setup(uint32_t fspi_op_seq_id, bool ignore_flash_sz)
 		cmd_id2 = FSPI_NOR_CMD_RDSR;
 		break;
 	default:
-		ERROR("Unsupported command\r\n");
+		ERROR("Unsupported command\n");
 		return;
 	}
 

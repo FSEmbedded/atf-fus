@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 NXP
+ * Copyright 2022-2023 NXP
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -13,40 +13,34 @@
 #include <context.h>
 #include <drivers/console.h>
 #include <drivers/generic_delay_timer.h>
+#include <drivers/nxp/trdc/imx_trdc.h>
 #include <lib/el3_runtime/context_mgmt.h>
 #include <lib/mmio.h>
 #include <lib/xlat_tables/xlat_tables_v2.h>
 #include <plat/common/platform.h>
 
 #include <ele_api.h>
-#include <imx8_lpuart.h>
-#include <platform_def.h>
-#include <plat_imx8.h>
-#include <trdc.h>
 #include <dram.h>
+#include <imx8_lpuart.h>
+#include <plat_imx8.h>
+#include <platform_def.h>
+
+#define MAP_BL31_TOTAL										   \
+	MAP_REGION_FLAT(BL31_BASE, BL31_LIMIT - BL31_BASE, MT_MEMORY | MT_RW | MT_SECURE)
+#define MAP_BL31_RO										   \
+	MAP_REGION_FLAT(BL_CODE_BASE, BL_CODE_END - BL_CODE_BASE, MT_MEMORY | MT_RO | MT_SECURE)
+
+#define MAP_BL32_TOTAL										   \
+	MAP_REGION_FLAT(BL32_BASE, BL32_SIZE, MT_MEMORY | MT_RW)
 
 #define TRUSTY_PARAMS_LEN_BYTES      (4096*2)
 
 static const mmap_region_t imx_mmap[] = {
-	/* APIS2 mapping */
-	MAP_REGION_FLAT(AIPS2_BASE, AIPSx_SIZE, MT_DEVICE | MT_RW | MT_NS),
-	MAP_REGION_FLAT(AIPS3_BASE, AIPSx_SIZE, MT_DEVICE | MT_RW | MT_NS),
-	MAP_REGION_FLAT(AIPS1_BASE, AIPSx_SIZE, MT_DEVICE | MT_RW), /* ECO fix , secure can access nonsecure */
-	/* AIPS4 */
-	MAP_REGION_FLAT(AIPS4_BASE, AIPSx_SIZE, MT_DEVICE | MT_RW | MT_NS),
-
-	MAP_REGION_FLAT(PLAT_GICD_BASE, 0x200000, MT_DEVICE | MT_RW), /* ECO fix, secure can access nonsecure */
-
-	MAP_REGION_FLAT(TRDC_A_BASE, TRDC_x_SISE, MT_DEVICE | MT_RW),
-	MAP_REGION_FLAT(TRDC_W_BASE, TRDC_x_SISE, MT_DEVICE | MT_RW),
-	MAP_REGION_FLAT(TRDC_M_BASE, TRDC_x_SISE, MT_DEVICE | MT_RW),
-	MAP_REGION_FLAT(TRDC_N_BASE, TRDC_x_SISE, MT_DEVICE | MT_RW),
-	MAP_REGION_FLAT(FSB_BASE, 0x10000, MT_DEVICE | MT_RW),
-	MAP_REGION_FLAT(S400_MU_BASE, 0x10000, MT_DEVICE | MT_RW),
-	MAP_REGION_FLAT(DDRMIX_BASE, DDRMIX_SIZE, MT_DEVICE | MT_RW | MT_NS),
-	MAP_REGION_FLAT(GPIO_BASE, GPIO_SIZE, MT_DEVICE | MT_RW),
-	MAP_REGION_FLAT(NIC_MAIN_GPV_BASE, 0x200000, MT_DEVICE | MT_RW),
-
+	AIPS1_MAP, AIPS2_MAP, AIPS4_MAP, GIC_MAP,
+	TRDC_A_MAP, TRDC_W_MAP, TRDC_M_MAP,
+	TRDC_N_MAP, DDRMIX_MAP, GPIO_MAP,
+	S400_MU_MAP, NIC_GPV_MAP, AIPS3_MAP,
+	FSB_MAP,
 	{0},
 };
 
@@ -114,6 +108,16 @@ void bl31_early_platform_setup2(u_register_t arg0, u_register_t arg1,
 
 void bl31_plat_arch_setup(void)
 {
+	/* no coherence memory support on i.MX9 */
+	const mmap_region_t bl_regions[] = {
+		MAP_BL31_TOTAL,
+		MAP_BL31_RO,
+#ifdef SPD_trusty
+		/* Map Tee memory */
+		MAP_BL32_TOTAL
+#endif
+	};
+
 	/* Assign all the GPIO pins to non-secure world by default */
 	mmio_write_32(GPIO2_BASE + 0x10, 0xffffffff);
 	mmio_write_32(GPIO2_BASE + 0x14, 0x3);
@@ -135,23 +139,10 @@ void bl31_plat_arch_setup(void)
 	mmio_write_32(GPIO1_BASE + 0x18, 0xffffffff);
 	mmio_write_32(GPIO1_BASE + 0x1c, 0x3);
 
-	mmap_add_region(OCRAM_BASE, OCRAM_BASE, OCRAM_SIZE,
-		MT_MEMORY | MT_RW | MT_SECURE);
-	mmap_add_region(BL31_BASE, BL31_BASE, (BL31_LIMIT - BL31_BASE),
-		MT_MEMORY | MT_RW | MT_SECURE);
-	mmap_add_region(BL_CODE_BASE, BL_CODE_BASE, (BL_CODE_END - BL_CODE_BASE),
-		MT_MEMORY | MT_RO | MT_SECURE);
-
-#ifdef SPD_trusty
-	mmap_add_region(BL32_BASE, BL32_BASE, BL32_SIZE, MT_MEMORY | MT_RW);
-#endif
-
-	mmap_add(imx_mmap);
-
-	init_xlat_tables();
-
+	setup_page_tables(bl_regions, imx_mmap);
 	enable_mmu_el3(0);
 
+	/* trdc must be initialized */
 	trdc_config();
 }
 
@@ -172,10 +163,7 @@ void bl31_platform_setup(void)
 void bl31_plat_runtime_setup(void)
 {
 	console_switch_state(CONSOLE_FLAG_RUNTIME);
-
-	return;
 }
-
 
 entry_point_info_t *bl31_plat_get_next_image_ep_info(unsigned int type)
 {

@@ -35,6 +35,7 @@
 /* non-secure uboot base */
 /* TODO */
 #define PLAT_NS_IMAGE_OFFSET		U(0x90200000)
+#define BL32_FDT_OVERLAY_ADDR           (PLAT_NS_IMAGE_OFFSET + 0x3000000)
 
 /* GICv4 base address */
 #define PLAT_GICD_BASE			U(0x48000000)
@@ -72,23 +73,7 @@
 #define GPIO4_BASE			U(0x43840000)
 #define GPIO5_BASE			U(0x43850000)
 
-#define CCM_BASE			U(0x44450000)
-#define SRC_BASE			U(0x44460000)
-
-#define TRDC_A_BASE			U(0x44270000)
-#define TRDC_W_BASE			U(0x42460000)
-#define TRDC_M_BASE			U(0x42810000)
-#define TRDC_N_BASE			U(0x49010000)
-#define TRDC_C_BASE			U(0x4ac40000)
-#define TRDC_D_BASE			U(0x4b040000)
-#define TRDC_E_BASE			U(0x4c840000)
-#define TRDC_G_BASE			U(0x4d840000)
-#define TRDC_H_BASE			U(0x4c040000)
-#define TRDC_V_BASE			U(0x4c440000)
-
 #define ELE_MU_BASE			U(0x47540000)
-
-#define TRDC_x_SISE			U(0x20000)
 
 #define SMT_BUFFER_BASE			U(0x8A246000)
 #define SMT_BUFFER_SIZE			0x1000

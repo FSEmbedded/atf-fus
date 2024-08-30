@@ -158,7 +158,7 @@ extern "C" {
 typedef void (*upwr_callb)(upwr_sg_t     sg,
 			   uint32_t      func,
 			   upwr_resp_t   errcode,
-			   int           ret);
+			   ...);
 
 /**---------------------------------------------------------------
  * INITIALIZATION, CONFIGURATION

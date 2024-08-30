@@ -24,7 +24,7 @@
 #if defined(PLAT_imx8qm) || defined(PLAT_imx8qx) || defined(PLAT_imx8dx) || defined(PLAT_imx8dxl)
 
 #ifdef PLAT_imx8qm
-const static int ap_cluster_index[PLATFORM_CLUSTER_COUNT] = {
+static const int ap_cluster_index[PLATFORM_CLUSTER_COUNT] = {
 #if (defined COCKPIT_A53)
 	SC_R_A53,
 #elif (defined COCKPIT_A72)

@@ -448,8 +448,9 @@ int save_phy_training_values(uint16_t **phy_ptr, uint32_t address_to_store,
 		/* Save DDR control register Timing CFG 0 and 4 */
 		phy_store  += size;
 		size = sizeof(ddrctrl_regs);
-		if (ret!=0)
+		if (ret != 0) {
 			ret = xspi_write(phy_store, ddrctrl_regs, size);
+		}
 #endif
 		/* Disable clocks in case they were disabled. */
 		phy_io_write16(phy, t_drtub |
@@ -502,7 +503,7 @@ int restore_phy_training_values(uint16_t **phy_ptr, uint32_t address_to_restore,
 		/* Reading 1D training values from flash*/
 		ret = xspi_read(phy_store, (uint32_t *)training_1D_values,
 				size);
-		if (ret) {
+		if (ret != 0) {
 #ifdef DEBUG_WARM_RESET
 			debug("Unable to Read 1D training values %d\n",
 					ret);
@@ -530,7 +531,7 @@ int restore_phy_training_values(uint16_t **phy_ptr, uint32_t address_to_restore,
 			ret = xspi_read(phy_store,
 					(uint32_t *)training_2D_values,	size);
 
-			if (ret) {
+			if (ret != 0) {
 #ifdef DEBUG_WARM_RESET
 				debug("Unable to Read 2D training values %d\n",
 						ret);

@@ -82,6 +82,24 @@
 #define SCMI_PWR_MEM_SLICE_IDX_VPU           19U
 #define SCMI_PWR_MEM_SLICE_IDX_WAKEUP        20U
 
+#define DEBUG_WAKEUP_MASK BIT(1)
+#define EVENT_WAKEUP_MASK BIT(0)
+
+#define SCMI_IMX_SYS_POWER_STATE_MODE_MASK	0xC0000000U
+#define SM_ACTIVE		BIT(0)
+#define FRO_ACTIVE		BIT(1)
+#define SYSCTR_ACTIVE		BIT(2)
+#define PMIC_STBY_INACTIVE	BIT(3)
+#define OSC24M_ACTIVE		BIT(4)
+#define DRAM_ACTIVE_MASK	BIT(5)
+
+#define GPIO_S_BASE(x)		((x) | BIT(28))
+#define GPIO_CTRL_REG_NUM	U(8)
+#define GPIO_PIN_MAX_NUM	U(32)
+#define GPIO_CTX(addr, num)	\
+	{.base = (addr), .pin_num = (num), }
+
+#define NETC_IREC_PCI_INT_X0	304
 
 extern void* imx95_scmi_handle;
 
@@ -142,6 +160,22 @@ struct plat_gic_ctx imx_gicv3_ctx;
 /* platfrom secure warm boot entry */
 static uintptr_t secure_entrypoint;
 
+/*
+ * IRQ masks used to check if any of the below IRQ is
+ * enabled as the wakeup source:
+ * lpuart3-8: 64-67, flexcan2:38, usdhc1-2:86-87,usdhc3:191
+ * flexcan3: 40, flexcan4: 42， flexcan5: 44, netc: 304;
+ */
+static uint32_t wakeup_irq_mask[IMR_NUM] = {
+	0x0, 0x1540, 0xc0000f, 0x0,
+	0x0, 0x80000000, 0x0, 0x0,
+	0x0, 0x10000,
+};
+
+static bool gpio_wakeup;
+static bool has_wakeup_irq;
+static bool has_netc_irq;
+
 static struct qchannel_hsk_config {
 	const uint32_t per_idx;
 	const unsigned int wakeup_irq;
@@ -160,10 +194,26 @@ static struct qchannel_hsk_config {
 	{ CPU_PER_LPI_IDX_LPUART7, 68 },
 	{ CPU_PER_LPI_IDX_LPUART8, 69 },
 
-	{ CPU_PER_LPI_IDX_GPIO2},
-	{ CPU_PER_LPI_IDX_GPIO3},
-	{ CPU_PER_LPI_IDX_GPIO4},
-	{ CPU_PER_LPI_IDX_GPIO5},
+	{ CPU_PER_LPI_IDX_GPIO2 },
+	{ CPU_PER_LPI_IDX_GPIO3 },
+	{ CPU_PER_LPI_IDX_GPIO4 },
+	{ CPU_PER_LPI_IDX_GPIO5 },
+};
+
+static uint32_t gpio_ctrl_offset[GPIO_CTRL_REG_NUM] = { 0xc, 0x10, 0x14, 0x18, 0x1c, 0x40, 0x54, 0x58 };
+struct gpio_ctx {
+	/* gpio base */
+	uintptr_t base;
+	/* port control */
+	uint32_t port_ctrl[GPIO_CTRL_REG_NUM];
+	/* GPIO ICR, Max 32 */
+	uint32_t pin_num;
+	uint32_t gpio_icr[GPIO_PIN_MAX_NUM];
+} wakeupmix_gpio_ctx[4] = {
+	GPIO_CTX(GPIO2_BASE,  32),
+	GPIO_CTX(GPIO3_BASE,  32),
+	GPIO_CTX(GPIO4_BASE,  30),
+	GPIO_CTX(GPIO5_BASE,  18),
 };
 
 static inline void is_wakeup_source(unsigned int gic_irq_mask, uint32_t idx)
@@ -205,11 +255,76 @@ void peripheral_qchannel_hsk(bool en, uint32_t last_core)
 			per_lpm[num_hsks_enabled].perId = hsk_config[i].per_idx;
 			per_lpm[num_hsks_enabled].lpmSetting = SCMI_CPU_PD_LPM_ON_ALWAYS;
 			num_hsks_enabled++;
+			hsk_config[i].active_wakeup = false;
 		}
 	}
 
 	scmi_per_lpm_mode_set(imx95_scmi_handle, scmi_cpu_id[last_core],
 			num_hsks_enabled, per_lpm);
+}
+
+void gpio_save(struct gpio_ctx *ctx, unsigned int port_num)
+{
+	unsigned int i, j;
+
+	for (i = 0; i < port_num; i++) {
+		/* save the port control setting */
+		for (j = 0; j < GPIO_CTRL_REG_NUM; j++) {
+			if (j < 4) {
+				ctx->port_ctrl[j] = mmio_read_32(ctx->base + gpio_ctrl_offset[j]);
+				/*
+				 * clear the permission setting to read the GPIO non-secure world setting.
+				*/
+				mmio_write_32(ctx->base + gpio_ctrl_offset[j], 0x0);
+			} else {
+				ctx->port_ctrl[j] = mmio_read_32(ctx->base + gpio_ctrl_offset[j]);
+			}
+		}
+
+		/* save the gpio icr setting */
+		for (j = 0; j < ctx->pin_num; j++) {
+			ctx->gpio_icr[j] = mmio_read_32(ctx->base + 0x80 + j * 4);
+
+			/* check if any gpio irq is enabled as wakeup source */
+			if (ctx->gpio_icr[j]) {
+				gpio_wakeup = true;
+			}
+		}
+
+		/* permission config retore back */
+		for (j = 0; j < 4; j++) {
+			mmio_write_32(ctx->base + gpio_ctrl_offset[j], ctx->port_ctrl[j]);
+		}
+
+		ctx++;
+	}
+}
+
+void gpio_restore(struct gpio_ctx *ctx, int port_num)
+{
+	unsigned int i, j;
+
+	for (i = 0; i < port_num; i++) {
+		/* permission config retore back */
+		for (j = 0; j < 4; j++) {
+			mmio_write_32(ctx->base + gpio_ctrl_offset[j], 0x0);
+		}
+
+		for (j = 0; j < ctx->pin_num; j++)
+			mmio_write_32(ctx->base + 0x80 + j * 4, ctx->gpio_icr[j]);
+
+		for (j = 4; j < GPIO_CTRL_REG_NUM; j++)
+			mmio_write_32(ctx->base + gpio_ctrl_offset[j], ctx->port_ctrl[j]);
+
+		/* permission config retore last */
+		for (j = 0; j < 4; j++) {
+			mmio_write_32(ctx->base + gpio_ctrl_offset[j], ctx->port_ctrl[j]);
+		}
+
+		ctx++;
+	}
+
+	gpio_wakeup = false;
 }
 
 void imx_set_sys_wakeup(uint32_t last_core, bool pdn)
@@ -235,7 +350,11 @@ void imx_set_sys_wakeup(uint32_t last_core, bool pdn)
 	} else {
 		/* switch to GIC wakeup source for last_core and cluster */
 		wakeup_flags = SCMI_GIC_WAKEUP;
-		mode = SCMI_CPU_SLEEP_RUN;
+		mode = SCMI_CPU_SLEEP_WAIT;
+		/* clear the wakeupmix irq enabled flag */
+		has_wakeup_irq = false;
+		/* clear the netcmix irq enabled flag */
+		has_netc_irq = false;
 	}
 
 	/*
@@ -252,6 +371,15 @@ void imx_set_sys_wakeup(uint32_t last_core, bool pdn)
 			irq_mask[i] =
 				~gicd_read_isenabler(gicd_base, 32 * (i + 1));
 			is_wakeup_source(irq_mask[i], i);
+		}
+
+		if ((irq_mask[i] & wakeup_irq_mask[i]) != wakeup_irq_mask[i]) {
+			/* Check whether netc irec pci int_x0 is allowed for wakeup */
+			if ((i == (NETC_IREC_PCI_INT_X0 >> 5)) &&
+			    (wakeup_irq_mask[i] & (1 << (NETC_IREC_PCI_INT_X0 % 32))))
+				has_netc_irq = true;
+			else
+				has_wakeup_irq = true;
 		}
 	}
 
@@ -305,7 +433,7 @@ int imx_validate_power_state(uint32_t power_state,
 	}
 
 	if (pwr_type == PSTATE_TYPE_STANDBY) {
-		CORE_PWR_STATE(req_state) = PLAT_MAX_RET_STATE;
+		CORE_PWR_STATE(req_state) = PLAT_MAX_OFF_STATE;
 		CLUSTER_PWR_STATE(req_state) = PLAT_MAX_RET_STATE;
 	}
 
@@ -328,6 +456,7 @@ void imx_set_cpu_boot_entry(uint32_t core_id, uint64_t boot_entry,
 int imx_pwr_domain_on(u_register_t mpidr)
 {
 	uint32_t core_id = MPIDR_AFFLVL1_VAL(mpidr);
+	uint32_t mask = DEBUG_WAKEUP_MASK | EVENT_WAKEUP_MASK;
 
 	if (boot_stage[core_id]) {
 		imx_set_cpu_boot_entry(core_id, secure_entrypoint,
@@ -337,6 +466,18 @@ int imx_pwr_domain_on(u_register_t mpidr)
 	}
 
 	scmi_core_start(imx95_scmi_handle, scmi_cpu_id[core_id]);
+	/*
+	 * Set NON-IRQ wakeup mask for both last core and cluster.
+	 * Disable wakeup on DEBUG_WAKEUP
+	 */
+	scmi_core_nonIrq_wake_set(imx95_scmi_handle, cpu_info[core_id].cpu_id, 0, 1, mask);
+
+	/* Set the LPM state for cpuidle. */
+	struct scmi_lpm_config cpu_lpm_cfg = {cpu_info[core_id].cpu_pd_id,
+	   SCMI_CPU_PD_LPM_ON_RUN, 0};
+	/* Set the default LPM state for cpuidle */
+	scmi_core_lpm_mode_set(imx95_scmi_handle, cpu_info[core_id].cpu_id,
+			        1, &cpu_lpm_cfg);
 
 	return PSCI_E_SUCCESS;
 }
@@ -347,7 +488,7 @@ void imx_pwr_domain_on_finish(const psci_power_state_t *target_state)
 	uint32_t core_id = MPIDR_AFFLVL1_VAL(mpidr);
 
 	scmi_core_set_sleep_mode(imx95_scmi_handle, cpu_info[core_id].cpu_id,
-				 SCMI_GIC_WAKEUP, SCMI_CPU_SLEEP_SUSPEND);
+				 SCMI_GIC_WAKEUP, SCMI_CPU_SLEEP_WAIT);
 
 	plat_gic_pcpu_init();
 	plat_gic_cpuif_enable();
@@ -367,6 +508,16 @@ void imx_pwr_domain_off(const psci_power_state_t *target_state)
 	/* Ensure the cluster can be powered off. */
 	write_clusterpwrdn(DSU_CLUSTER_PWR_OFF);
 
+	/* Ensure the cluster can be powered off. */
+	write_clusterpwrdn(DSU_CLUSTER_PWR_OFF);
+
+	/* Configure core LPM state for hotplug. */
+	struct scmi_lpm_config cpu_lpm_cfg = {cpu_info[core_id].cpu_pd_id,
+	   SCMI_CPU_PD_LPM_ON_RUN_WAIT_STOP, 0};
+	/* Set the default LPM state for cpuidle */
+	scmi_core_lpm_mode_set(imx95_scmi_handle, cpu_info[core_id].cpu_id,
+			        1, &cpu_lpm_cfg);
+
 	/*
 	 * mask all the GPC IRQ wakeup to make sure no IRQ can wakeup this core
 	 * so we need to use SW_WAKEUP for hotplug purpose
@@ -377,10 +528,14 @@ void imx_pwr_domain_off(const psci_power_state_t *target_state)
 				 SCMI_GPC_WAKEUP, SCMI_CPU_SLEEP_SUSPEND);
 }
 
+
 void imx_pwr_domain_suspend(const psci_power_state_t *target_state)
 {
 	uint64_t mpidr = read_mpidr_el1();
 	uint32_t core_id = MPIDR_AFFLVL1_VAL(mpidr);
+	uint32_t l3_retn = 0;
+	uint32_t sys_mode;
+	bool keep_wakupmix_on = false;
 
 	/* do cpu level config */
 	if (is_local_state_off(CORE_PWR_STATE(target_state))) {
@@ -395,17 +550,26 @@ void imx_pwr_domain_suspend(const psci_power_state_t *target_state)
 		/* L3 retention */
 		if (is_local_state_retn(CLUSTER_PWR_STATE(target_state))) {
 			write_clusterpwrdn(DSU_CLUSTER_PWR_OFF | BIT(1));
+			l3_retn = BIT_32(SCMI_PWR_MEM_SLICE_IDX_A55L3);
 		} else {
 			write_clusterpwrdn(DSU_CLUSTER_PWR_OFF);
+			l3_retn = 0;
 		}
 	}
 
 	if (is_local_state_off(SYSTEM_PWR_STATE(target_state))) {
 		nocmix_pwr_down(core_id);
+		gpio_save(wakeupmix_gpio_ctx, 4);
+		keep_wakupmix_on = (gpio_wakeup || has_wakeup_irq);
 		/*
 		 * Setup NOC and WAKEUP MIX to power down when Linux suspends.
 		 */
 		struct scmi_lpm_config cpu_lpm_cfg[] = {
+			{
+				cpu_info[IMX95_A55P_IDX].cpu_pd_id,
+				SCMI_CPU_PD_LPM_ON_RUN_WAIT_STOP,
+				l3_retn
+			},
 			{
 				SCMI_PWR_MIX_SLICE_IDX_NOC,
 				SCMI_CPU_PD_LPM_ON_RUN_WAIT_STOP,
@@ -413,7 +577,8 @@ void imx_pwr_domain_suspend(const psci_power_state_t *target_state)
 			},
 			{
 				SCMI_PWR_MIX_SLICE_IDX_WAKEUP,
-				SCMI_CPU_PD_LPM_ON_RUN_WAIT_STOP,
+				keep_wakupmix_on ? SCMI_CPU_PD_LPM_ON_ALWAYS :
+					SCMI_CPU_PD_LPM_ON_RUN_WAIT_STOP,
 				0
 			}
 		};
@@ -423,6 +588,15 @@ void imx_pwr_domain_suspend(const psci_power_state_t *target_state)
 				       cpu_info[IMX95_A55P_IDX].cpu_id,
 				       sizeof(cpu_lpm_cfg)/sizeof(struct scmi_lpm_config),
 				       cpu_lpm_cfg);
+
+
+		sys_mode = SCMI_IMX_SYS_POWER_STATE_MODE_MASK;
+		if (has_netc_irq) {
+			sys_mode |= OSC24M_ACTIVE;
+			scmi_sys_pwr_state_set(imx95_scmi_handle,
+					       SCMI_SYS_PWR_FORCEFUL_REQ,
+					       sys_mode);
+		}
 	}
 }
 
@@ -431,11 +605,24 @@ void imx_pwr_domain_suspend_finish(const psci_power_state_t *target_state)
 	uint64_t mpidr = read_mpidr_el1();
 	uint32_t core_id = MPIDR_AFFLVL1_VAL(mpidr);
 	uint32_t val;
+	uint32_t sys_mode;
 
 	/* system level */
 	if (is_local_state_off(SYSTEM_PWR_STATE(target_state))) {
+		sys_mode = SCMI_IMX_SYS_POWER_STATE_MODE_MASK;
+		if (has_netc_irq) {
+			scmi_sys_pwr_state_set(imx95_scmi_handle,
+					       SCMI_SYS_PWR_FORCEFUL_REQ,
+					       sys_mode);
+		}
 		nocmix_pwr_up(core_id);
+		gpio_restore(wakeupmix_gpio_ctx, 4);
 		struct scmi_lpm_config cpu_lpm_cfg[] = {
+			{
+				cpu_info[IMX95_A55P_IDX].cpu_pd_id,
+				SCMI_CPU_PD_LPM_ON_ALWAYS,
+				BIT_32(SCMI_PWR_MEM_SLICE_IDX_A55L3)
+			},
 			{
 				SCMI_PWR_MIX_SLICE_IDX_NOC,
 				SCMI_CPU_PD_LPM_ON_ALWAYS,
@@ -512,6 +699,48 @@ void __dead2 imx_system_reset(void)
 		;
 }
 
+int __dead2 imx_system_reset2(int is_vendor, int reset_type, u_register_t cookie)
+{
+	int ret;
+
+	/* TODO: temp workaround for GIC to let reset done */
+	gicd_clr_ctlr(PLAT_GICD_BASE,
+		      CTLR_ENABLE_G0_BIT |
+		      CTLR_ENABLE_G1S_BIT |
+		      CTLR_ENABLE_G1NS_BIT,
+		      RWP_TRUE);
+
+	switch(reset_type) {
+	case PSCI_RESET2_SYSTEM_WARM_RESET:
+		/* Force: work, Gracefull: not work */
+		ret = scmi_sys_pwr_state_set(imx95_scmi_handle,
+					     SCMI_SYS_PWR_FORCEFUL_REQ,
+					     SCMI_SYS_PWR_WARM_RESET);
+		break;
+	case PSCI_RESET2_SYSTEM_COLD_RESET:
+		/* Force: work, Gracefull: not work */
+		ret = scmi_sys_pwr_state_set(imx95_scmi_handle,
+					     SCMI_SYS_PWR_FORCEFUL_REQ,
+					     SCMI_SYS_PWR_COLD_RESET);
+		break;
+	case PSCI_RESET2_SYSTEM_BOARD_RESET:
+		/* Force: work, Gracefull: not work */
+		ret = scmi_sys_pwr_state_set(imx95_scmi_handle,
+					     SCMI_SYS_PWR_FORCEFUL_REQ,
+					     SCMI_SYS_STATE_FULL_RESET);
+		break;
+	default:
+		ret = PSCI_E_INVALID_PARAMS;
+	}
+
+	if (ret) {
+		VERBOSE("%s failed: %d\n", __func__, ret);
+	}
+
+	while (true)
+		;
+}
+
 void __dead2 imx_system_off(void)
 {
 	int ret;
@@ -538,6 +767,7 @@ static const plat_psci_ops_t imx_plat_psci_ops = {
 	.get_sys_suspend_power_state = imx_get_sys_suspend_power_state,
 	.pwr_domain_pwr_down_wfi = imx_pwr_domain_pwr_down_wfi,
 	.system_reset = imx_system_reset,
+	.system_reset2 = imx_system_reset2,
 	.system_off = imx_system_off,
 };
 
@@ -545,16 +775,25 @@ static const plat_psci_ops_t imx_plat_psci_ops = {
 int plat_setup_psci_ops(uintptr_t sec_entrypoint,
 			const plat_psci_ops_t **psci_ops)
 {
+	uint32_t mask = DEBUG_WAKEUP_MASK | EVENT_WAKEUP_MASK;
+
 	/* sec_entrypoint is used for warm reset */
 	secure_entrypoint = sec_entrypoint;
 
 	imx_set_cpu_boot_entry(0, secure_entrypoint, SCMI_CPU_VEC_FLAGS_BOOT);
 
+	/*
+	 * Set NON-IRQ wakeup mask for both last core and cluster.
+	 * Disable wakeup on DEBUG_WAKEUP
+	 */
+	scmi_core_nonIrq_wake_set(imx95_scmi_handle, scmi_cpu_id[0], 0, 1, mask);
+	scmi_core_nonIrq_wake_set(imx95_scmi_handle, scmi_cpu_id[IMX95_A55P_IDX], 0, 1, mask);
+
 	/* Setup A55 Cluster state for Cpuidle. */
 	struct scmi_lpm_config cpu_lpm_cfg[] = {
 		{
 			cpu_info[IMX95_A55P_IDX].cpu_pd_id,
-			SCMI_CPU_PD_LPM_ON_RUN_WAIT_STOP,
+			SCMI_CPU_PD_LPM_ON_ALWAYS,
 			BIT_32(SCMI_PWR_MEM_SLICE_IDX_A55L3)
 		},
 		{
@@ -575,19 +814,26 @@ int plat_setup_psci_ops(uintptr_t sec_entrypoint,
 			       sizeof(cpu_lpm_cfg)/sizeof(struct scmi_lpm_config),
 			       cpu_lpm_cfg);
 
-	/*
-	 * Set core/custer to GIC wakeup source since NOCMIX is not
-	 * powered down, config the target mode to SUSPEND
-	 */
-	scmi_core_set_sleep_mode(imx95_scmi_handle, scmi_cpu_id[0],
-				 SCMI_GIC_WAKEUP, SCMI_CPU_SLEEP_SUSPEND);
+	/* Set the LPM state for cpuidle for A55C0 (boot core) */
+	cpu_lpm_cfg[0].power_domain = cpu_info[0].cpu_pd_id;
+	cpu_lpm_cfg[0].lpmsetting = SCMI_CPU_PD_LPM_ON_RUN;
+	cpu_lpm_cfg[0].retentionmask = 0;
+	scmi_core_lpm_mode_set(imx95_scmi_handle, cpu_info[0].cpu_id,
+			        1, cpu_lpm_cfg);
 
 	/*
 	 * Set core/custer to GIC wakeup source since NOCMIX is not
-	 * powered down, config the target mode to SUSPEND
+	 * powered down, config the target mode to WAIT
+	 */
+	scmi_core_set_sleep_mode(imx95_scmi_handle, scmi_cpu_id[0],
+			        SCMI_GIC_WAKEUP, SCMI_CPU_SLEEP_WAIT);
+
+	/*
+	 * Set core/custer to GIC wakeup source since NOCMIX is not
+	 * powered down, config the target mode to WAIT
 	 */
 	scmi_core_set_sleep_mode(imx95_scmi_handle, scmi_cpu_id[IMX95_A55P_IDX],
-				 SCMI_GIC_WAKEUP, SCMI_CPU_SLEEP_SUSPEND);
+			        SCMI_GIC_WAKEUP, SCMI_CPU_SLEEP_WAIT);
 
 	*psci_ops = &imx_plat_psci_ops;
 

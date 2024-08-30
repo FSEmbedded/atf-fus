@@ -91,7 +91,7 @@ sc_rm_pt_t global_dpu_part = 0, global_os_part = 0;
 #error "Provide proper UART number in IMX_DEBUG_UART"
 #endif
 
-const static int imx8qm_cci_map[] = {
+static const int imx8qm_cci_map[] = {
 	CLUSTER0_CCI_SLAVE_IFACE,
 	CLUSTER1_CCI_SLAVE_IFACE
 };

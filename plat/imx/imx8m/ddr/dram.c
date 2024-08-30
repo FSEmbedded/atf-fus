@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2022 NXP
+ * Copyright 2019-2023 NXP
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -15,9 +15,6 @@
 
 #define IMX_SIP_DDR_DVFS_GET_FREQ_COUNT		0x10
 #define IMX_SIP_DDR_DVFS_GET_FREQ_INFO		0x11
-
-#define TIMING_CFG_PTR(ptr, old_base, new_base)	\
-	((struct dram_cfg_param *)(((uint64_t)(ptr) & ~(uint64_t)(old_base)) + (uint64_t)(new_base)))
 
 struct dram_info dram_info;
 
@@ -40,8 +37,15 @@ static uint32_t fsp_init_reg[3][4] = {
 	{ DDRC_FREQ2_INIT3(0), DDRC_FREQ2_INIT4(0), DDRC_FREQ2_INIT6(0), DDRC_FREQ2_INIT7(0) },
 };
 
+#if defined(PLAT_imx8mq)
+static inline struct dram_cfg_param *get_cfg_ptr(void *ptr,
+		void *old_base, void *new_base)
+{
+	uintptr_t offset = (uintptr_t)ptr & ~((uintptr_t)old_base);
 
-#if defined (PLAT_imx8mq)
+	return (struct dram_cfg_param *)(offset + new_base);
+}
+
 /* copy the dram timing info from DRAM to OCRAM */
 void imx8mq_dram_timing_copy(struct dram_timing_info *from)
 {
@@ -51,42 +55,43 @@ void imx8mq_dram_timing_copy(struct dram_timing_info *from)
 	memcpy(dram_timing_saved, from, sizeof(dram_timing_saved));
 
 	/* correct the header after copied into ocram */
-	info->ddrc_cfg = TIMING_CFG_PTR(info->ddrc_cfg, from, dram_timing_saved);
-	info->ddrphy_cfg = TIMING_CFG_PTR(info->ddrphy_cfg, from, dram_timing_saved);
-	info->ddrphy_trained_csr = TIMING_CFG_PTR(info->ddrphy_trained_csr, from, dram_timing_saved);
-	info->ddrphy_pie = TIMING_CFG_PTR(info->ddrphy_pie, from, dram_timing_saved);
+	info->ddrc_cfg = get_cfg_ptr(info->ddrc_cfg, from, dram_timing_saved);
+	info->ddrphy_cfg = get_cfg_ptr(info->ddrphy_cfg, from, dram_timing_saved);
+	info->ddrphy_trained_csr = get_cfg_ptr(info->ddrphy_trained_csr, from, dram_timing_saved);
+	info->ddrphy_pie = get_cfg_ptr(info->ddrphy_pie, from, dram_timing_saved);
 }
 #endif
 
 #if defined(PLAT_imx8mp)
 static uint32_t lpddr4_mr_read(unsigned int mr_rank, unsigned int mr_addr)
 {
-        unsigned int tmp, tmp1;
+	unsigned int tmp, drate_byte;
 
-        tmp = mmio_read_32(DRC_PERF_MON_MRR0_DAT(0));
-        mmio_write_32(DRC_PERF_MON_MRR0_DAT(0), tmp | 0x1);
-        do {
-                tmp = mmio_read_32(DDRC_MRSTAT(0));
-        } while (tmp & 0x1);
+	tmp = mmio_read_32(DRC_PERF_MON_MRR0_DAT(0));
+	mmio_write_32(DRC_PERF_MON_MRR0_DAT(0), tmp | 0x1);
+	do {
+		tmp = mmio_read_32(DDRC_MRSTAT(0));
+	} while (tmp & 0x1);
 
-        mmio_write_32(DDRC_MRCTRL0(0), (mr_rank << 4) | 0x1);
-        mmio_write_32(DDRC_MRCTRL1(0), (mr_addr << 8));
-        mmio_write_32(DDRC_MRCTRL0(0), (mr_rank << 4) | ((uint32_t)0x1<<31) | 0x1 );
+	mmio_write_32(DDRC_MRCTRL0(0), (mr_rank << 4) | 0x1);
+	mmio_write_32(DDRC_MRCTRL1(0), (mr_addr << 8));
+	mmio_write_32(DDRC_MRCTRL0(0), (mr_rank << 4) | BIT(31) | 0x1);
 
-        // Workaround for SNPS STAR 9001549457
-        do{
-                tmp = mmio_read_32(DDRC_MRSTAT(0));
-        } while (tmp & 0x1);
+	/* Workaround for SNPS STAR 9001549457 */
+	do {
+		tmp = mmio_read_32(DDRC_MRSTAT(0));
+	} while (tmp & 0x1);
 
-        do {
-                tmp = mmio_read_32(DRC_PERF_MON_MRR0_DAT(0));
-        } while ((tmp & 0x8) == 0);
-        tmp = mmio_read_32(DRC_PERF_MON_MRR1_DAT(0));
+	do {
+		tmp = mmio_read_32(DRC_PERF_MON_MRR0_DAT(0));
+	} while (!(tmp & 0x8));
+	tmp = mmio_read_32(DRC_PERF_MON_MRR1_DAT(0));
 
-        tmp1 = (mmio_read_32(DDRC_DERATEEN(0))>>4)&0xff;
-        tmp = (tmp>>(tmp1*8)) & 0xff;
-        mmio_write_32(DRC_PERF_MON_MRR0_DAT(0), 0x4);
-        return tmp;
+	drate_byte = (mmio_read_32(DDRC_DERATEEN(0)) >> 4) & 0xff;
+	tmp = (tmp >> (drate_byte * 8)) & 0xff;
+	mmio_write_32(DRC_PERF_MON_MRR0_DAT(0), 0x4);
+
+	return tmp;
 }
 #endif
 
@@ -104,8 +109,8 @@ static void get_mr_values(uint32_t (*mr_value)[8])
 
 #if defined(PLAT_imx8mp)
 		if (dram_info.dram_type == DDRC_LPDDR4) {
-			mr_value[fsp_index][5] = lpddr4_mr_read(1, 12); /* read MR12 from DRAM */
-			mr_value[fsp_index][7] = lpddr4_mr_read(1, 14); /* read MR14 from DRAM */
+			mr_value[fsp_index][5] = lpddr4_mr_read(1, MR12); /* read MR12 from DRAM */
+			mr_value[fsp_index][7] = lpddr4_mr_read(1, MR14); /* read MR14 from DRAM */
 		}
 #endif
 	}
@@ -119,12 +124,10 @@ static void save_rank_setting(void)
 	/* only support maximum 3 setpoints */
 	pstate_num = (pstate_num > MAX_FSP_NUM) ? MAX_FSP_NUM : pstate_num;
 
-	for(i = 0; i < pstate_num; i++) {
-		offset = i ? (i + 1) * 0x1000 : 0;
-		if (dram_info.dram_type == DDRC_LPDDR4) {
-			dram_info.rank_setting[i][0] = mmio_read_32(DDRC_DRAMTMG2(0) + offset);
-		} else {
-			dram_info.rank_setting[i][0] = mmio_read_32(DDRC_DRAMTMG2(0) + offset);
+	for (i = 0U; i < pstate_num; i++) {
+		offset = i ? (i + 1) * 0x1000 : 0U;
+		dram_info.rank_setting[i][0] = mmio_read_32(DDRC_DRAMTMG2(0) + offset);
+		if (dram_info.dram_type != DDRC_LPDDR4) {
 			dram_info.rank_setting[i][1] = mmio_read_32(DDRC_DRAMTMG9(0) + offset);
 		}
 #if !defined(PLAT_imx8mq)
@@ -231,10 +234,8 @@ void dram_info_init(unsigned long dram_timing_base)
 
 #if defined(PLAT_imx8mq)
 	imx8mq_dram_timing_copy((struct dram_timing_info *)dram_timing_base);
-
 	dram_timing_base = (unsigned long) dram_timing_saved;
 #endif
-
 	get_mr_values(dram_info.mr_table);
 
 	dram_info.timing_info = (struct dram_timing_info *)dram_timing_base;
@@ -251,8 +252,9 @@ void dram_info_init(unsigned long dram_timing_base)
 	dram_info.num_fsp = (i > MAX_FSP_NUM) ? MAX_FSP_NUM : i;
 
 	/* no valid fsp table, return directly */
-	if (i == 0)
+	if (i == 0U) {
 		return;
+	}
 
 	/* save the DRAMTMG2/9 for rank to rank workaround */
 	save_rank_setting();
@@ -353,9 +355,10 @@ int dram_dvfs_handler(uint32_t smc_fid, void *handle,
 			}
 		}
 #if defined(PLAT_imx8mq)
-		for (int i = 0; i < 4; i++) {
-			if (i != cpu_id && online_cores & (1 << (i * 8)))
+		for (unsigned int i = 0; i < PLATFORM_CORE_COUNT; i++) {
+			if (i != cpu_id && online_cores & (1 << (i * 8))) {
 				imx_gpc_core_wake(1 << i);
+			}
 		}
 #endif
 		/* make sure all the core in WFE */

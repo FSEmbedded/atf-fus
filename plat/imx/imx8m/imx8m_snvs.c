@@ -1,13 +1,14 @@
 /*
- * Copyright 2022 NXP
+ * Copyright 2022-2023 NXP
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
+
 #include <lib/mmio.h>
 #include <platform_def.h>
 
-#define SNVS_HPCOMR             0x04
-#define SNVS_NPSWA_EN           (1U << 31)
+#define SNVS_HPCOMR		U(0x04)
+#define SNVS_NPSWA_EN		BIT(31)
 
 void enable_snvs_privileged_access(void)
 {

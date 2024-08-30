@@ -1,11 +1,12 @@
 #
-# Copyright 2022 NXP
+# Copyright 2022-2023 NXP
 #
 # SPDX-License-Identifier: BSD-3-Clause
 #
 
 PLAT_INCLUDES		:=	-Iplat/imx/common/include		\
 				-Iplat/imx/imx93/include		\
+				-Iplat/imx/imx9/include		\
 				-Iplat/imx/common
 # Translation tables library
 include lib/xlat_tables_v2/xlat_tables.mk
@@ -31,6 +32,7 @@ BL31_SOURCES		+=	plat/common/aarch64/crash_console_helpers.S   \
 				plat/imx/imx93/plat_topology.c			\
 				plat/imx/common/lpuart_console.S		\
 				plat/imx/imx93/trdc.c			\
+				plat/imx/imx93/pwr_ctrl.c			\
 				plat/imx/imx93/imx93_bl31_setup.c		\
 				plat/imx/imx93/imx93_psci.c			\
 				plat/imx/imx93/src.c			\
@@ -40,6 +42,7 @@ BL31_SOURCES		+=	plat/common/aarch64/crash_console_helpers.S   \
 				lib/cpus/aarch64/cortex_a55.S			\
 				drivers/delay_timer/delay_timer.c		\
 				drivers/delay_timer/generic_delay_timer.c	\
+				drivers/nxp/trdc/imx_trdc.c			\
 				${IMX_GIC_SOURCES}				\
 				${IMX_DRAM_SOURCES}				\
 				${XLAT_TABLES_LIB_SRCS}
@@ -51,8 +54,8 @@ endif
 RESET_TO_BL31		:=	1
 HW_ASSISTED_COHERENCY	:= 	1
 USE_COHERENT_MEM	:=	0
-PROGRAMMABLE_RESET_ADDRESS := 1
-COLD_BOOT_SINGLE_CPU := 1
+PROGRAMMABLE_RESET_ADDRESS :=	1
+COLD_BOOT_SINGLE_CPU	:=	1
 
 BL32_BASE               ?=      0x96000000
 BL32_SIZE               ?=      0x02000000

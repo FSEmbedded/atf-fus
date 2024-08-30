@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2022 NXP
+ * Copyright 2019-2023 NXP
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -22,6 +22,9 @@
 #define ACTIVE_RANK_MASK	U(0x3)
 #define DDRC_ACTIVE_ONE_RANK	U(0x1)
 #define DDRC_ACTIVE_TWO_RANK	U(0x2)
+
+#define MR12			U(12)
+#define MR14			U(14)
 
 #define MAX_FSP_NUM		U(3)
 

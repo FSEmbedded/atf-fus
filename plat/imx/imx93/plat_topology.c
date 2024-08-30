@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 NXP.
+ * Copyright 2022-2023 NXP
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -29,8 +29,9 @@ int plat_core_pos_by_mpidr(u_register_t mpidr)
 
 	mpidr &= MPIDR_AFFINITY_MASK;
 
-	if (mpidr & ~(MPIDR_CLUSTER_MASK | MPIDR_CPU_MASK))
+	if (mpidr & ~(MPIDR_CLUSTER_MASK | MPIDR_CPU_MASK)) {
 		return -1;
+	}
 
 	cpu_id = MPIDR_AFFLVL1_VAL(mpidr);
 

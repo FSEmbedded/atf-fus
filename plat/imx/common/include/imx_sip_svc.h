@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2022, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015-2023, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -135,10 +135,18 @@ int dram_dvfs_handler(uint32_t smc_fid, void *handle,
 	u_register_t x1, u_register_t x2, u_register_t x3);
 #endif
 
-#if defined(PLAT_imx93) || defined(PLAT_imx91p)
+#if defined(PLAT_imx91)
+int dram_dvfs_handler(uint32_t smc_fid, void *handle,
+       u_register_t x1, u_register_t x2, u_register_t x3);
+#endif
+#if defined(PLAT_imx93)
 int imx_src_handler(uint32_t smc_fid, u_register_t x1,
 		    u_register_t x2, u_register_t x3, void *handle);
 int dram_dvfs_handler(uint32_t smc_fid, void *handle,
 	u_register_t x1, u_register_t x2, u_register_t x3);
+#endif
+#if defined(PLAT_imx95)
+int imx_src_handler(uint32_t smc_fid, u_register_t x1,
+		    u_register_t x2, u_register_t x3, void *handle);
 #endif
 #endif /* __IMX_SIP_SVC_H__ */

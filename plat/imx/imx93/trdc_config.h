@@ -1,22 +1,14 @@
 /*
- * Copyright 2022 NXP
+ * Copyright 2022-2023 NXP
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <trdc.h>
+#include <drivers/nxp/trdc/imx_trdc.h>
 
-#define SP(X)           ((X) << 12)
-#define SU(X)           ((X) << 8)
-#define NP(X)           ((X) << 4)
-#define NU(X)           ((X) << 0)
-#define LK              BIT(31)
-
-#define RWX             7
-#define RW              6
-#define RX              5
-#define R               4
-#define X               1
+#define TRDC_A_BASE	U(0x44270000)
+#define TRDC_W_BASE	U(0x42460000)
+#define TRDC_N_BASE	U(0x49010000)
 
 /* GLBAC7 is used for TRDC only, any setting to GLBAC7 will be ignored */
 /* GLBAC6 is used for fused modules, any setting to GLBAC6 will be ignored */
@@ -25,7 +17,6 @@
 struct trdc_glbac_config trdc_a_mbc_glbac[] = {
 	/* MBC0 */
 	{ 0, 0, SP(RW)  | SU(RW)   | NP(RW)  | NU(RW) },
-
 	/* MBC1 */
 	{ 1, 0, SP(RW)  | SU(RW)   | NP(RW)  | NU(RW) },
 	{ 1, 1, SP(RW)  | SU(R)    | NP(RW)  | NU(R)  },
@@ -73,7 +64,6 @@ struct trdc_mrc_config trdc_a_mrc[] = {
 struct trdc_glbac_config trdc_w_mbc_glbac[] = {
 	/* MBC0 */
 	{ 0, 0, SP(RW) | SU(RW) | NP(RW) | NU(RW) },
-
 	/* MBC1 */
 	{ 1, 0, SP(RW) | SU(RW) | NP(RW) | NU(RW) },
 };
@@ -107,14 +97,12 @@ struct trdc_mbc_config trdc_w_mbc[] = {
 struct trdc_glbac_config trdc_w_mrc_glbac[] = {
 	/* MRC0 */
 	{ 0, 0, SP(RX)  | SU(RX)   | NP(RX)   | NU(RX)    },
-
 	/* MRC1 */
 	{ 1, 0, SP(RWX) | SU(RWX)  | NP(RWX)  | NU(RWX)   },
 };
 
 struct trdc_mrc_config trdc_w_mrc[] = {
 	{ 0, 3, 0, 0x00000000, 0x00040000, 0, false }, /* MRC0 A55 ROM for A55 DID3 */
-
 	{ 1, 2, 0, 0x28000000, 0x08000000, 0, true  }, /* MRC1 FLEXSPI1 for M33 DID2 */
 	{ 1, 3, 0, 0x28000000, 0x08000000, 0, false }, /* MRC1 FLEXSPI1 for A55 DID3 */
 };
@@ -123,14 +111,11 @@ struct trdc_mrc_config trdc_w_mrc[] = {
 struct trdc_glbac_config trdc_n_mbc_glbac[] = {
 	/* MBC0 */
 	{ 0, 0, SP(RW) | SU(RW) | NP(RW) | NU(RW) },
-
 	/* MBC1 */
 	{ 1, 0, SP(RW) | SU(RW) | NP(RW) | NU(RW) },
-
 	/* MBC2 */
 	{ 2, 0, SP(RW) | SU(RW) | NP(RW) | NU(RW) },
 	{ 2, 1, SP(R) | SU(R) | NP(R) | NU(R) },
-
 	/* MBC3 */
 	{ 3, 0, SP(RW) | SU(RW) | NP(RW) | NU(RW) },
 	{ 3, 1, SP(RWX) | SU(RWX) | NP(RWX) | NU(RWX) },
@@ -184,6 +169,7 @@ struct trdc_mbc_config trdc_n_mbc[] = {
 	{ 2, 3, 1, MBC_BLK_ALL, 0, false }, /* MBC2 GIC for A55 DID3 */
 	{ 3, 3, 0, MBC_BLK_ALL, 1, true  }, /* MBC3 OCRAM for A55 DID3 */
 	{ 3, 3, 1, MBC_BLK_ALL, 1, true  }, /* MBC3 OCRAM for A55 DID3 */
+
 	{ 3, 3, 0, 0, 0, false  }, /* MBC3 OCRAM for A55 DID3 */
 	{ 3, 3, 0, 1, 0, false  }, /* MBC3 OCRAM for A55 DID3 */
 	{ 3, 3, 0, 2, 0, false  }, /* MBC3 OCRAM for A55 DID3 */

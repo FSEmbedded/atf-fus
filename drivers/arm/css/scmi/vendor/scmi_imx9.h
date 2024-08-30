@@ -57,7 +57,7 @@
 #define IMX9_SCMI_CORE_START_MSG_LEN		8
 #define IMX9_SCMI_CORE_START_RESP_LEN		8
 
-#define IMX9_SCMI_CORE_STOP_MSG			0x4
+#define IMX9_SCMI_CORE_STOP_MSG			0x5
 #define IMX9_SCMI_CORE_STOP_MSG_LEN		8
 #define IMX9_SCMI_CORE_STOP_RESP_LEN		8
 
@@ -73,6 +73,10 @@
 #define IMX9_SCMI_CORE_SETIRQWAKESET_MSG_LEN	64
 #define IMX9_SCMI_CORE_SETIRQWAKESET_RESP_LEN	8
 
+#define IMX9_SCMI_CORE_NONIRQWAKESET_MSG       0x9
+#define IMX9_SCMI_CORE_NONIRQWAKESET_MSG_LEN   64
+#define IMX9_SCMI_CORE_NONIRQWAKESET_RESP_LEN  8
+
 #define IMX9_SCMI_CORE_LPMMODESET_MSG		0xA
 #define IMX9_SCMI_CORE_LPMMODESET_MSG_LEN	12
 #define IMX9_SCMI_CORE_LPMMODESET_RESP_LEN	8
@@ -80,6 +84,10 @@
 #define IMX9_SCMI_PER_LPMMODESET_MSG		0xB
 #define IMX9_SCMI_PER_LPMMODESET_MSG_LEN	12
 #define IMX9_SCMI_PER_LPMMODESET_RESP_LEN	8
+
+#define IMX9_SCMI_CORE_GETINFO_MSG		0xC
+#define IMX9_SCMI_CORE_GETINFO_MSG_LEN		8
+#define IMX9_SCMI_CORE_GETINFO_RESP_LEN		24
 
 #define SCMI_CPU_VEC_FLAGS_BOOT			BIT(30)
 #define SCMI_CPU_VEC_FLAGS_RESUME		BIT(31)
@@ -140,9 +148,13 @@ struct scmi_per_lpm_config
 int scmi_core_set_reset_addr(void *p, uint64_t reset_addr, uint32_t cpu_id, uint32_t attr);
 int scmi_core_start(void *p, uint32_t cpu_id);
 int scmi_core_stop(void *p, uint32_t cpu_id);
+int scmi_core_info_get(void *p, uint32_t cpu_id, uint32_t *run, uint32_t *sleep,
+		       uint64_t *vector);
 int scmi_core_set_sleep_mode(void *p, uint32_t cpu_id, uint32_t wakeup, uint32_t mode);
 int scmi_core_Irq_wake_set(void *p, uint32_t cpu_id, uint32_t mask_idx,
 			   uint32_t num_mask, uint32_t *mask);
+int scmi_core_nonIrq_wake_set(void *p, uint32_t cpu_id, uint32_t mask_idx,
+			uint32_t num_mask, uint32_t mask);
 int scmi_core_lpm_mode_set(void *p, uint32_t cpu_id, uint32_t num_configs,
 			   struct scmi_lpm_config *cfg);
 int scmi_per_lpm_mode_set(void *p, uint32_t cpu_id, uint32_t num_configs,

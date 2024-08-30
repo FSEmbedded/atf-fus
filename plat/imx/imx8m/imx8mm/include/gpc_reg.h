@@ -127,4 +127,3 @@
 #define IRQ_IMR_NUM			U(4)
 
 #endif /* GPC_REG_H */
-

@@ -10,7 +10,7 @@
 
 #include <platform_def.h>
 
-static void inline sema42_lock(uint8_t lock_id)
+static inline void sema42_lock(uint8_t lock_id)
 {
 	assert(lock_id < 64);
 
@@ -19,7 +19,7 @@ static void inline sema42_lock(uint8_t lock_id)
 	} while (mmio_read_8(0x44260000) != 0x1);
 }
 
-static void inline sema42_unlock(uint8_t lock_id)
+static inline void sema42_unlock(uint8_t lock_id)
 {
 	mmio_write_8(SEMA42_1_BASE + lock_id, 0x0);
 }

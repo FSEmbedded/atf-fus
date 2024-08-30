@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022 NXP
+ * Copyright 2018-2023 NXP
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -16,8 +16,10 @@
 
 #define CCM_SRC_CTRL_OFFSET     (IMX_CCM_BASE + 0x800)
 #define CCM_CCGR_OFFSET         (IMX_CCM_BASE + 0x4000)
+#define CCM_TARGET_ROOT_OFFSET	(IMX_CCM_BASE + 0x8000)
 #define CCM_SRC_CTRL(n)		(CCM_SRC_CTRL_OFFSET + 0x10 * (n))
 #define CCM_CCGR(n)		(CCM_CCGR_OFFSET + 0x10 * (n))
+#define CCM_TARGET_ROOT(n)	(CCM_TARGET_ROOT_OFFSET + 0x80 * (n))
 
 #define DBGCAM_EMPTY		0x36000000
 
@@ -34,17 +36,13 @@ void rank_setting_update(void)
 	/* only support maximum 3 setpoints */
 	pstate_num = (pstate_num > MAX_FSP_NUM) ? MAX_FSP_NUM : pstate_num;
 
-	for (i = 0; i < pstate_num; i++) {
-		offset = i ? (i + 1) * 0x1000 : 0;
-		if (dram_info.dram_type == DDRC_LPDDR4) {
-			mmio_write_32(DDRC_DRAMTMG2(0) + offset,
-				dram_info.rank_setting[i][0]);
-		} else {
-			mmio_write_32(DDRC_DRAMTMG2(0) + offset,
-				dram_info.rank_setting[i][0]);
-			mmio_write_32(DDRC_DRAMTMG9(0) + offset,
-				dram_info.rank_setting[i][1]);
+	for (i = 0U; i < pstate_num; i++) {
+		offset = i ? (i + 1) * 0x1000 : 0U;
+		mmio_write_32(DDRC_DRAMTMG2(0) + offset, dram_info.rank_setting[i][0]);
+		if (dram_info.dram_type != DDRC_LPDDR4) {
+			mmio_write_32(DDRC_DRAMTMG9(0) + offset, dram_info.rank_setting[i][1]);
 		}
+
 #if !defined(PLAT_imx8mq)
 		mmio_write_32(DDRC_RANKCTL(0) + offset,
 			dram_info.rank_setting[i][2]);
@@ -149,8 +147,8 @@ void dram_exit_retention(void)
 	mmio_write_32(CCM_SRC_CTRL(15), 2);
 
 	/* change the clock source of dram_apb_clk_root */
-	mmio_write_32(0x3038a088, (0x7 << 24) | (0x7 << 16));
-	mmio_write_32(0x3038a084, (0x4 << 24) | (0x3 << 16));
+	mmio_write_32(CCM_TARGET_ROOT(65) + 0x8, (0x7 << 24) | (0x7 << 16));
+	mmio_write_32(CCM_TARGET_ROOT(65) + 0x4, (0x4 << 24) | (0x3 << 16));
 
 #if !defined(LPA_ENABLE)
 	/* disable iso */
