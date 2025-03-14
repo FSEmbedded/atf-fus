@@ -55,8 +55,27 @@
 #define MAX_MMAP_REGIONS		17
 #endif
 
-#define IMX_LPUART_BASE			0x44380000
-#define IMX_BOOT_UART_CLK_IN_HZ		24000000 /* Select 24MHz oscillator */
+#define DEBUG_CONSOLE   1
+
+#define IMX_LPUART1_BASE		U(0x44380000)
+#define IMX_LPUART2_BASE		U(0x44390000)
+#define IMX_LPUART3_BASE		U(0x42570000)
+#define IMX_LPUART4_BASE		U(0x42580000)
+#define IMX_LPUART5_BASE		U(0x42590000)
+#define IMX_LPUART6_BASE		U(0x425a0000)
+#define IMX_LPUART7_BASE		U(0x42690000)
+#define IMX_LPUART8_BASE		U(0x426a0000)
+
+#define CCGR_URT1	U(52)
+#define CCGR_URT2	U(53)
+#define CCGR_URT3	U(54)
+#define CCGR_URT4	U(55)
+#define CCGR_URT5	U(56)
+#define CCGR_URT6	U(57)
+#define CCGR_URT7	U(58)
+#define CCGR_URT8	U(59)
+
+#define IMX_BOOT_UART_CLK_IN_HZ		U(24000000) /* Select 24MHz oscillator */
 #define IMX_CONSOLE_BAUDRATE		115200
 
 #define AIPSx_SIZE			U(0x800000)

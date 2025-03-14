@@ -24,6 +24,7 @@
 #include <imx8_lpuart.h>
 #include <plat_imx8.h>
 #include <platform_def.h>
+#include <imx91_ccm.h>
 
 #define TRUSTY_PARAMS_LEN_BYTES      (4096*2)
 
@@ -73,13 +74,14 @@ static uint32_t get_spsr_for_bl33_entry(void)
 void bl31_early_platform_setup2(u_register_t arg0, u_register_t arg1,
 		u_register_t arg2, u_register_t arg3)
 {
+#if DEBUG_CONSOLE
 	static console_t console;
 
-	console_lpuart_register(IMX_LPUART_BASE, IMX_BOOT_UART_CLK_IN_HZ,
-		     IMX_CONSOLE_BAUDRATE, &console);
+	get_uart_console(&console);
 
 	/* This console is only used for boot stage */
 	console_set_scope(&console, CONSOLE_FLAG_BOOT);
+#endif
 
 	/*
 	 * tell BL3-1 where the non-secure software image is located
