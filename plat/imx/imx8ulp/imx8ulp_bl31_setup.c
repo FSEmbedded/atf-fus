@@ -66,10 +66,6 @@ void bl31_early_platform_setup2(u_register_t arg0, u_register_t arg1,
 {
 	static console_t console;
 
-	/* config the TPM5 clock */
-	mmio_write_32(IMX_PCC3_BASE + 0xd0, 0x92000000);
-	mmio_write_32(IMX_PCC3_BASE + 0xd0, 0xd2000000);
-
 	/* config the TPM6_7 clock, select SOSCDIV*/
 	mmio_write_32(IMX_CGC1_BASE + 0x908, 0x303);
 
