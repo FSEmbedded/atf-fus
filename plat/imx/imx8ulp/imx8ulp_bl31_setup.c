@@ -27,6 +27,7 @@
 #include <upower_soc_defs.h>
 #include <upower_api.h>
 #include <xrdc.h>
+#include <imx8ulp_console.h>
 
 #define TRUSTY_PARAMS_LEN_BYTES      (4096*2)
 
@@ -88,8 +89,7 @@ void bl31_early_platform_setup2(u_register_t arg0, u_register_t arg1,
 	mmio_write_32(0x2e200018, 0xffffffff);
 	mmio_write_32(0x2e20001c, 0x3);
 
-	console_lpuart_register(IMX_LPUART_BASE, IMX_BOOT_UART_CLK_IN_HZ,
-		     IMX_CONSOLE_BAUDRATE, &console);
+	get_uart_console(&console);
 
 	/* This console is only used for boot stage */
 	console_set_scope(&console, CONSOLE_FLAG_BOOT | CONSOLE_FLAG_RUNTIME);

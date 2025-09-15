@@ -25,6 +25,7 @@ IMX_GIC_SOURCES		:=	${GICV3_SOURCES}			\
 
 BL31_SOURCES		+=	plat/imx/common/lpuart_console.S	\
 				plat/imx/common/imx8_helpers.S		\
+				plat/imx/imx8ulp/imx8ulp_console.c	\
 				plat/imx/imx8ulp/imx8ulp_bl31_setup.c	\
 				plat/imx/imx8ulp/imx8ulp_psci.c		\
 				plat/imx/imx8ulp/apd_context.c		\
