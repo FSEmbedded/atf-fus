@@ -190,7 +190,7 @@ static void bl31_tzc380_setup(void)
 void bl31_early_platform_setup2(u_register_t arg0, u_register_t arg1,
 		u_register_t arg2, u_register_t arg3)
 {
-	unsigned int console_base = IMX_BOOT_UART_BASE;
+	unsigned int console_base = imx8m_uart_get_base();
 	static console_t console;
 	int i;
 
@@ -205,14 +205,12 @@ void bl31_early_platform_setup2(u_register_t arg0, u_register_t arg1,
 
 	imx_csu_init(csu_cfg);
 
-	if (console_base == 0U) {
-		console_base = imx8m_uart_get_base();
+	if (console_base) {
+		console_imx_uart_register(console_base, IMX_BOOT_UART_CLK_IN_HZ,
+			IMX_CONSOLE_BAUDRATE, &console);
+		/* This console is only used for boot stage */
+		console_set_scope(&console, CONSOLE_FLAG_BOOT);
 	}
-
-	console_imx_uart_register(console_base, IMX_BOOT_UART_CLK_IN_HZ,
-		IMX_CONSOLE_BAUDRATE, &console);
-	/* This console is only used for boot stage */
-	console_set_scope(&console, CONSOLE_FLAG_BOOT);
 
 	imx8m_caam_init();
 	/*

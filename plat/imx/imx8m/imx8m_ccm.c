@@ -54,5 +54,7 @@ unsigned int imx8m_uart_get_base(void)
 	 * We should return an error and inform the user but we can't do it
 	 * this early.
 	 */
-	return 0;
+
+	/* MK_2025-11-18: Return the default address if no UART is enabled */
+	return IMX_BOOT_UART_BASE;
 }
