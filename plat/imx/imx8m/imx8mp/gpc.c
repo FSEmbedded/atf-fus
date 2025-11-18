@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2020 NXP
+ * Copyright 2019-2022 NXP
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -69,10 +69,11 @@ enum pu_domain_id {
 	HDMIMIX,
 	HDMI_PHY,
 	DDRMIX,
+	MAX_DOMAINS,
 };
 
 /* PU domain, add some hole to minimize the uboot change */
-static struct imx_pwr_domain pu_domains[20] = {
+static struct imx_pwr_domain pu_domains[MAX_DOMAINS] = {
 	[MIPI_PHY1] = IMX_PD_DOMAIN(MIPI_PHY1, false),
 	[PCIE_PHY] = IMX_PD_DOMAIN(PCIE_PHY, false),
 	[USB1_PHY] = IMX_PD_DOMAIN(USB1_PHY, true),
@@ -171,13 +172,13 @@ static void imx_noc_qos(unsigned int domain_id)
 
 void imx_gpc_pm_domain_enable(uint32_t domain_id, bool on)
 {
-	struct imx_pwr_domain *pwr_domain;
+	struct imx_pwr_domain *pwr_domain = &pu_domains[domain_id];
 	unsigned int i;
 
-	if (domain_id >= ARRAY_SIZE(pu_domains))
+	/* validate the domain id */
+	if (domain_id >= MAX_DOMAINS) {
 		return;
-
-	pwr_domain = &pu_domains[domain_id];
+	}
 
 	if (domain_id == HSIOMIX) {
 		for (i = 0; i < ARRAY_SIZE(hsiomix_clk); i++) {
@@ -401,7 +402,7 @@ void imx_gpc_init(void)
 	/*
 	 * Set the CORE & SCU power up timing:
 	 * SW = 0x1, SW2ISO = 0x1;
-	 * the CPU CORE and SCU power up timming counter
+	 * the CPU CORE and SCU power up timing counter
 	 * is drived  by 32K OSC, each domain's power up
 	 * latency is (SW + SW2ISO) / 32768
 	 */

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2019, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015-2023, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -32,19 +32,22 @@
 #define IMX_SIP_SRC_M4_START		0x00
 #define IMX_SIP_SRC_M4_STARTED		0x01
 #define IMX_SIP_SRC_M4_STOP		0x02
+#define IMX_SIP_SRC_M4_RESET_ADDR_SET	0x03
 #define IMX_SIP_SRC_SET_SECONDARY_BOOT	0x10
 #define IMX_SIP_SRC_IS_SECONDARY_BOOT	0x11
 
 #define IMX_SIP_GET_SOC_INFO		0xC2000006
 
-#define IMX_SIP_HAB            0xc2000007
-#define IMX_SIP_HAB_AUTHENTICATE	0x00
-#define IMX_SIP_HAB_ENTRY			0x01
-#define IMX_SIP_HAB_EXIT			0x02
+#define IMX_SIP_HAB			0xC2000007
+#define IMX_SIP_HAB_AUTH_IMG		0x00
+#define IMX_SIP_HAB_ENTRY		0x01
+#define IMX_SIP_HAB_EXIT		0x02
 #define IMX_SIP_HAB_REPORT_EVENT	0x03
 #define IMX_SIP_HAB_REPORT_STATUS	0x04
 #define IMX_SIP_HAB_FAILSAFE		0x05
 #define IMX_SIP_HAB_CHECK_TARGET	0x06
+#define IMX_SIP_HAB_GET_VERSION		0x07
+#define IMX_SIP_HAB_AUTH_IMG_NO_DCD	0x08
 
 #define IMX_SIP_NOC			0xc2000008
 #define IMX_SIP_NOC_LCDIF		0x0
@@ -74,6 +77,18 @@ int imx_kernel_entry_handler(uint32_t smc_fid, u_register_t x1,
 
 #define IMX_SIP_HIFI_XRDC               0xC200000E
 
+#define IMX_SIP_LMM			0xC200000F
+#define IMX_SIP_LMM_BOOT		0x0
+#define IMX_SIP_LMM_SHUTDOWN		0x1
+
+#if defined(PLAT_imx8qm) && defined(SPD_trusty)
+#define IMX_SIP_CONFIGURE_MEM_FOR_VPU       0xC2000010
+#define IMX_SIP_GET_PARTITION_NUMBER        0xC2000011
+int imx_configure_memory_for_vpu(void *handle, u_register_t x1);
+int imx_get_partition_number(void *handle);
+#endif
+
+
 #if defined(PLAT_imx8mq)
 int imx_soc_info_handler(uint32_t smc_fid, u_register_t x1,
 			 u_register_t x2, u_register_t x3);
@@ -83,7 +98,6 @@ int imx_src_handler(uint32_t smc_fid, u_register_t x1,
 		    u_register_t x2, u_register_t x3, void *handle);
 int dram_dvfs_handler(uint32_t smc_fid, void *handle,
 	u_register_t x1, u_register_t x2, u_register_t x3);
-
 int imx_hab_handler(uint32_t smc_fid, u_register_t x1,
 	u_register_t x2, u_register_t x3, u_register_t x4);
 int imx_noc_handler(uint32_t smc_fid, u_register_t x1,
@@ -98,7 +112,7 @@ int imx_gpc_handler(uint32_t smc_fid, u_register_t x1,
 int imx_src_handler(uint32_t smc_fid, u_register_t x1,
 		    u_register_t x2, u_register_t x3, void *handle);
 int imx_hab_handler(uint32_t smc_fid, u_register_t x1,
-	u_register_t x2, u_register_t x3, u_register_t x4);
+		    u_register_t x2, u_register_t x3, u_register_t x4);
 #endif
 
 #if (defined(PLAT_imx8qm) || defined(PLAT_imx8qx) || defined(PLAT_imx8dx) || defined(PLAT_imx8dxl))
@@ -126,8 +140,20 @@ int dram_dvfs_handler(uint32_t smc_fid, void *handle,
 	u_register_t x1, u_register_t x2, u_register_t x3);
 #endif
 
+#if defined(PLAT_imx91)
+int dram_dvfs_handler(uint32_t smc_fid, void *handle,
+       u_register_t x1, u_register_t x2, u_register_t x3);
+#endif
 #if defined(PLAT_imx93)
 int imx_src_handler(uint32_t smc_fid, u_register_t x1,
+		    u_register_t x2, u_register_t x3, void *handle);
+int dram_dvfs_handler(uint32_t smc_fid, void *handle,
+	u_register_t x1, u_register_t x2, u_register_t x3);
+#endif
+#if defined(PLAT_imx95)
+int imx_src_handler(uint32_t smc_fid, u_register_t x1,
+		    u_register_t x2, u_register_t x3, void *handle);
+int imx_lmm_handler(uint32_t smc_fid, u_register_t x1,
 		    u_register_t x2, u_register_t x3, void *handle);
 #endif
 #endif /* __IMX_SIP_SVC_H__ */

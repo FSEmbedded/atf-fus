@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2019-2020, ARM Limited and Contributors. All rights reserved.
+# Copyright (c) 2019-2023, ARM Limited and Contributors. All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
 #
@@ -11,10 +11,17 @@ PLAT_INCLUDES		:=	-Iplat/imx/common/include		\
 				-Iplat/imx/imx8m/include		\
 				-Iplat/imx/imx8m/imx8mm/include		\
 				-Idrivers/imx/usdhc			\
-				-Iinclude/common/tbbr
+				-Iinclude/common/tbbr			\
+				-Iinclude/lib/libfdt
+ifeq (${IMX_ANDROID_BUILD},true)
+PLAT_INCLUDES           +=	-Iinclude/drivers/nxp/crypto/caam	\
+				-Iinclude/drivers/nxp/timer
+endif
 
 # Include GICv3 driver files
 include drivers/arm/gic/v3/gicv3.mk
+
+include lib/libfdt/libfdt.mk
 
 IMX_DRAM_SOURCES	:=	plat/imx/imx8m/ddr/dram.c		\
 				plat/imx/imx8m/ddr/clock.c		\
@@ -29,11 +36,12 @@ IMX_GIC_SOURCES		:=	${GICV3_SOURCES}			\
 
 BL31_SOURCES		+=	plat/imx/common/imx8_helpers.S			\
 				plat/imx/imx8m/gpc_common.c			\
-				plat/imx/imx8m/hab.c				\
+				plat/imx/imx8m/imx_hab.c			\
 				plat/imx/imx8m/imx_aipstz.c			\
 				plat/imx/imx8m/imx_rdc.c			\
 				plat/imx/imx8m/imx8m_csu.c			\
 				plat/imx/imx8m/imx8m_caam.c			\
+				plat/imx/imx8m/imx8m_ccm.c			\
 				plat/imx/imx8m/imx8m_psci_common.c		\
 				plat/imx/imx8m/imx8m_snvs.c			\
 				plat/imx/imx8m/imx8mm/imx8mm_bl31_setup.c	\
@@ -50,9 +58,19 @@ BL31_SOURCES		+=	plat/imx/common/imx8_helpers.S			\
 				${XLAT_TABLES_LIB_SRCS}				\
 				${IMX_DRAM_SOURCES}				\
 				${IMX_GIC_SOURCES}
+ifeq (${IMX_ANDROID_BUILD},true)
+BL31_SOURCES           +=       drivers/nxp/crypto/caam/src/caam.c              \
+				drivers/nxp/crypto/caam/src/rng.c               \
+				drivers/nxp/crypto/caam/src/jobdesc.c           \
+				drivers/nxp/crypto/caam/src/sec_hw_specific.c   \
+				drivers/nxp/crypto/caam/src/sec_jr_driver.c     \
+				drivers/nxp/timer/nxp_timer.c
+endif
+
 
 ifeq (${NEED_BL2},yes)
 BL2_SOURCES		+=	common/desc_image_load.c			\
+				common/fdt_wrappers.c				\
 				plat/imx/common/imx8_helpers.S			\
 				plat/imx/common/imx_uart_console.S		\
 				plat/imx/imx8m/imx8mm/imx8mm_bl2_el3_setup.c	\
@@ -98,7 +116,7 @@ ifeq (${NEED_BL2},yes)
 $(eval $(call add_define,NEED_BL2))
 LOAD_IMAGE_V2		:=	1
 # Non-TF Boot ROM
-BL2_AT_EL3		:=	1
+RESET_TO_BL2	:=	1
 endif
 
 ifneq (${TRUSTED_BOARD_BOOT},0)
@@ -130,15 +148,16 @@ certificates: $(ROT_KEY)
 $(ROT_KEY): | $(BUILD_PLAT)
 	@echo "  OPENSSL $@"
 	@if [ ! -f $(ROT_KEY) ]; then \
-		openssl genrsa 2048 > $@ 2>/dev/null; \
+		${OPENSSL_BIN_PATH}/openssl genrsa 2048 > $@ 2>/dev/null; \
 	fi
 
 $(ROTPK_HASH): $(ROT_KEY)
 	@echo "  OPENSSL $@"
-	$(Q)openssl rsa -in $< -pubout -outform DER 2>/dev/null |\
-	openssl dgst -sha256 -binary > $@ 2>/dev/null
+	$(Q)${OPENSSL_BIN_PATH}/openssl rsa -in $< -pubout -outform DER 2>/dev/null |\
+	${OPENSSL_BIN_PATH}/openssl dgst -sha256 -binary > $@ 2>/dev/null
 endif
 
+ENABLE_PIE		:=	1
 USE_COHERENT_MEM	:=	1
 RESET_TO_BL31		:=	1
 A53_DISABLE_NON_TEMPORAL_HINT := 0
@@ -154,7 +173,30 @@ BL32_SIZE		?=	0x2000000
 $(eval $(call add_define,BL32_SIZE))
 
 IMX_BOOT_UART_BASE	?=	0x30890000
+ifeq (${IMX_BOOT_UART_BASE},auto)
+    override IMX_BOOT_UART_BASE	:=	0
+endif
 $(eval $(call add_define,IMX_BOOT_UART_BASE))
+
+EL3_EXCEPTION_HANDLING := $(SDEI_SUPPORT)
+ifeq (${SDEI_SUPPORT}, 1)
+BL31_SOURCES 		+= 	plat/imx/common/imx_ehf.c	\
+				plat/imx/common/imx_sdei.c
+endif
+
+ifeq (${MEASURED_BOOT},1)
+    MEASURED_BOOT_MK := drivers/measured_boot/event_log/event_log.mk
+    $(info Including ${MEASURED_BOOT_MK})
+    include ${MEASURED_BOOT_MK}
+
+ifneq (${MBOOT_EL_HASH_ALG}, sha256)
+    $(eval $(call add_define,TF_MBEDTLS_MBOOT_USE_SHA512))
+endif
+
+BL2_SOURCES		+=	plat/imx/imx8m/imx8m_measured_boot.c	\
+				plat/imx/imx8m/imx8m_dyn_cfg_helpers.c	\
+				${EVENT_LOG_SOURCES}
+endif
 
 $(eval $(call add_define,IMX8M_DDR4_DVFS))
 
@@ -168,4 +210,17 @@ endif
 
 ifeq (${IMX_ANDROID_BUILD},true)
 $(eval $(call add_define,IMX_ANDROID_BUILD))
+
+CONFIG_PHYS_64BIT	:=	1
+$(eval $(call add_define,CONFIG_PHYS_64BIT))
+NXP_SEC_LE		:=	1
+$(eval $(call add_define,NXP_SEC_LE))
+IMX_CAAM_ENABLE		:=	1
+$(eval $(call add_define,IMX_CAAM_ENABLE))
+IMX_CAAM_32BIT		:=	1
+$(eval $(call add_define,IMX_CAAM_32BIT))
+IMX_IMAGE_8M		:=	1
+$(eval $(call add_define,IMX_IMAGE_8M))
+CACHE_WRITEBACK_GRANULE :=	64
+$(eval $(call add_define,CACHE_WRITEBACK_GRANULE))
 endif

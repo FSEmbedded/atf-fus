@@ -100,6 +100,14 @@
 #define BL32_FDT_OVERLAY_ADDR		0x9d000000
 #endif
 
+#ifdef SPD_trusty
+#define SECURE_HEAP_BASE		0xe0000000
+#define SECURE_HEAP_LIMIT		0x10000000
+
+#define VPU_FIRMWARE_BASE		0x96000000
+#define VPU_FIRMWARE_LIMIT		0x02000000
+#endif
+
 #endif /* TEE section */
 
 #define OCRAM_BASE		0x100000
@@ -149,6 +157,7 @@
 #define IMX_WUP_IRQSTR_BASE		0x51090000
 #define IMX_REG_BASE			0x50000000
 #define IMX_REG_SIZE			0x10000000
+#define IMX_CAAM_BASE			0x31400000
 
 #define COUNTER_FREQUENCY		8000000 /* 8MHz */
 
@@ -166,16 +175,13 @@
 #define MAX_MMAP_REGIONS		12
 #endif
 
-/* enable it to make debug message to SC console */
-#define SC_CONSOLE			0
-
 #ifdef SPD_trusty
 #define DEBUG_CONSOLE_A53		1
 #else
 #define DEBUG_CONSOLE_A53		DEBUG_CONSOLE
 #endif
 
-#define IMX_TRUSTY_STACK_SIZE 0x100
+#define IMX_TRUSTY_STACK_SIZE 0x200
 #define TRUSTY_SHARED_MEMORY_OBJ_SIZE (12 * 1024)
 #define IMX_SEPARATE_NOBITS_BASE	U(0x130000)
 #define IMX_SEPARATE_NOBITS_LIMIT	U(0x140000)

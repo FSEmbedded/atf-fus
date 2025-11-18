@@ -63,6 +63,8 @@
 
 #if defined(IMX_USE_UART0)
 #define IMX_BOOT_UART_BASE		0x5a060000
+#elif defined(IMX_USE_UART1)
+#define IMX_BOOT_UART_BASE		0x5a070000
 #elif defined(IMX_USE_UART3)
 #define IMX_BOOT_UART_BASE		0x5a090000
 #else
@@ -80,14 +82,12 @@
 #define IMX_WUP_IRQSTR_BASE		0x51090000
 #define IMX_REG_BASE			0x50000000
 #define IMX_REG_SIZE			0x10000000
+#define IMX_CAAM_BASE			0x31400000
 
 #define COUNTER_FREQUENCY		8000000
 
 /* non-secure u-boot base */
 #define PLAT_NS_IMAGE_OFFSET		0x80020000
-
-/* enable it to make debug message to SC console */
-#define SC_CONSOLE			0
 
 #ifdef SPD_trusty
 #define DEBUG_CONSOLE_A35		1
@@ -95,7 +95,7 @@
 #define DEBUG_CONSOLE_A35		DEBUG_CONSOLE
 #endif
 
-#define IMX_TRUSTY_STACK_SIZE 0x100
+#define IMX_TRUSTY_STACK_SIZE 0x200
 #define TRUSTY_SHARED_MEMORY_OBJ_SIZE (12 * 1024)
 #define IMX_SEPARATE_NOBITS_BASE	U(0x130000)
 #define IMX_SEPARATE_NOBITS_LIMIT	U(0x140000)

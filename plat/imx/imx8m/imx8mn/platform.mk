@@ -1,5 +1,5 @@
 #
-# Copyright 2019-2020 NXP
+# Copyright 2019-2022 NXP
 #
 # SPDX-License-Identifier: BSD-3-Clause
 #
@@ -7,6 +7,10 @@
 PLAT_INCLUDES		:=	-Iplat/imx/common/include		\
 				-Iplat/imx/imx8m/include		\
 				-Iplat/imx/imx8m/imx8mn/include
+ifeq (${IMX_ANDROID_BUILD},true)
+PLAT_INCLUDES           +=	-Iinclude/drivers/nxp/crypto/caam	\
+				-Iinclude/drivers/nxp/timer
+endif
 # Translation tables library
 include lib/xlat_tables_v2/xlat_tables.mk
 
@@ -27,10 +31,11 @@ IMX_GIC_SOURCES		:=	${GICV3_SOURCES}			\
 
 BL31_SOURCES		+=	plat/imx/common/imx8_helpers.S			\
 				plat/imx/imx8m/gpc_common.c			\
-				plat/imx/imx8m/hab.c				\
+				plat/imx/imx8m/imx_hab.c			\
 				plat/imx/imx8m/imx_aipstz.c			\
 				plat/imx/imx8m/imx_rdc.c			\
 				plat/imx/imx8m/imx8m_caam.c			\
+				plat/imx/imx8m/imx8m_ccm.c			\
 				plat/imx/imx8m/imx8m_csu.c			\
 				plat/imx/imx8m/imx8m_psci_common.c		\
 				plat/imx/imx8m/imx8m_snvs.c			\
@@ -48,7 +53,16 @@ BL31_SOURCES		+=	plat/imx/common/imx8_helpers.S			\
 				${IMX_DRAM_SOURCES}				\
 				${IMX_GIC_SOURCES}				\
 				${XLAT_TABLES_LIB_SRCS}
+ifeq (${IMX_ANDROID_BUILD},true)
+BL31_SOURCES		+=	drivers/nxp/crypto/caam/src/caam.c		\
+				drivers/nxp/crypto/caam/src/rng.c		\
+				drivers/nxp/crypto/caam/src/jobdesc.c		\
+				drivers/nxp/crypto/caam/src/sec_hw_specific.c	\
+				drivers/nxp/crypto/caam/src/sec_jr_driver.c	\
+				drivers/nxp/timer/nxp_timer.c
+endif
 
+ENABLE_PIE		:=	1
 USE_COHERENT_MEM	:=	1
 RESET_TO_BL31		:=	1
 A53_DISABLE_NON_TEMPORAL_HINT := 0
@@ -64,7 +78,16 @@ BL32_SIZE		?=	0x2000000
 $(eval $(call add_define,BL32_SIZE))
 
 IMX_BOOT_UART_BASE	?=	0x30890000
+ifeq (${IMX_BOOT_UART_BASE},auto)
+    override IMX_BOOT_UART_BASE	:=	0
+endif
 $(eval $(call add_define,IMX_BOOT_UART_BASE))
+
+EL3_EXCEPTION_HANDLING := $(SDEI_SUPPORT)
+ifeq (${SDEI_SUPPORT}, 1)
+BL31_SOURCES 		+= 	plat/imx/common/imx_ehf.c	\
+				plat/imx/common/imx_sdei.c
+endif
 
 $(eval $(call add_define,IMX8M_DDR4_DVFS))
 
@@ -78,4 +101,17 @@ endif
 
 ifeq (${IMX_ANDROID_BUILD},true)
 $(eval $(call add_define,IMX_ANDROID_BUILD))
+
+CONFIG_PHYS_64BIT	:=	1
+$(eval $(call add_define,CONFIG_PHYS_64BIT))
+NXP_SEC_LE		:=	1
+$(eval $(call add_define,NXP_SEC_LE))
+IMX_CAAM_ENABLE		:=	1
+$(eval $(call add_define,IMX_CAAM_ENABLE))
+IMX_CAAM_32BIT		:=	1
+$(eval $(call add_define,IMX_CAAM_32BIT))
+IMX_IMAGE_8M		:=	1
+$(eval $(call add_define,IMX_IMAGE_8M))
+CACHE_WRITEBACK_GRANULE :=	64
+$(eval $(call add_define,CACHE_WRITEBACK_GRANULE))
 endif

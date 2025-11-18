@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2018-2023, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -49,14 +49,16 @@ void imx_pwr_domain_off(const psci_power_state_t *target_state)
 	plat_gic_cpuif_disable();
 	imx_set_cpu_pwr_off(core_id);
 
-	/* TODO: Find out why this is still
-	 * needed in order not to break suspend */
+	/*
+	 *  TODO: Find out why this is still
+	 * needed in order not to break suspend
+	 */
 	udelay(50);
 }
 
 void imx_domain_suspend(const psci_power_state_t *target_state)
 {
-	uint64_t base_addr = BL31_BASE;
+	uint64_t base_addr = BL31_START;
 	uint64_t mpidr = read_mpidr_el1();
 	unsigned int core_id = MPIDR_AFFLVL0_VAL(mpidr);
 

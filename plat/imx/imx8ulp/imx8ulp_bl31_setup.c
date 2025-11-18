@@ -38,6 +38,8 @@ static const mmap_region_t imx_mmap[] = {
 	MAP_REGION_FLAT(0x27010000, 0x20000, MT_DEVICE | MT_RW | MT_NS), /* MU and FSB */
 	MAP_REGION_FLAT(0x2802B000, 0x1000, MT_DEVICE | MT_RW | MT_NS), /* SEC SIM */
 	MAP_REGION_FLAT(DEVICE1_BASE, DEVICE1_SIZE, MT_DEVICE | MT_RW),
+	/* Map partial DRAM space for DRAM low-power mode control */
+	MAP_REGION_FLAT(DEVICE2_BASE, DEVICE2_SIZE, MT_DEVICE | MT_RW),
 	/* For SCMI shared memory region */
 	MAP_REGION_FLAT(0x2201f000, 0x1000, MT_RW | MT_DEVICE),
 	{0}
@@ -64,9 +66,8 @@ void bl31_early_platform_setup2(u_register_t arg0, u_register_t arg1,
 {
 	static console_t console;
 
-	/* config the TPM5 clock */
-	mmio_write_32(IMX_PCC3_BASE + 0xd0, 0x92000000);
-	mmio_write_32(IMX_PCC3_BASE + 0xd0, 0xd2000000);
+	/* config the TPM6_7 clock, select SOSCDIV*/
+	mmio_write_32(IMX_CGC1_BASE + 0x908, 0x303);
 
 	/* enable the GPIO D,E,F non-secure access by default */
 	mmio_write_32(IMX_PCC4_BASE + 0x78, 0xc0000000);

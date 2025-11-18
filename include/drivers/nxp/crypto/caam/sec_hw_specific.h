@@ -32,7 +32,7 @@
 
  /* Struct representing various job ring registers */
 struct jobring_regs {
-#ifdef NXP_SEC_BE
+#if defined(NXP_SEC_BE) || defined(IMX_CAAM_ENABLE)
 	unsigned int irba_h;
 	unsigned int irba_l;
 #else
@@ -45,7 +45,7 @@ struct jobring_regs {
 	unsigned int irsa;
 	unsigned int rsvd3;
 	unsigned int irja;
-#ifdef NXP_SEC_BE
+#if defined(NXP_SEC_BE)  || defined(IMX_CAAM_ENABLE)
 	unsigned int orba_h;
 	unsigned int orba_l;
 #else
@@ -123,6 +123,7 @@ struct jobring_regs {
 
  /* RNG RDSTA bitmask */
 #define RNG_STATE0_HANDLE_INSTANTIATED	0x00000001
+#define RNG_STATE1_HANDLE_INSTANTIATED	0x00000002
 #define RTMCTL_PRGM 0x00010000	/* 1 -> program mode, 0 -> run mode */
  /* use von Neumann data in both entropy shifter and statistical checker */
 #define RTMCTL_SAMP_MODE_VON_NEUMANN_ES_SC	 0
@@ -221,7 +222,7 @@ typedef struct {
  /*  Lists the possible states for a job ring. */
 typedef enum sec_job_ring_state_e {
 	SEC_JOB_RING_STATE_STARTED,	/* Job ring is initialized */
-	SEC_JOB_RING_STATE_RESET,	/* Job ring reset is in progres */
+	SEC_JOB_RING_STATE_RESET,	/* Job ring reset is in progress */
 } sec_job_ring_state_t;
 
 struct sec_job_ring_t {

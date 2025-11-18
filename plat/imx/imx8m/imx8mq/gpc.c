@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2018-2023, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -10,25 +10,25 @@
 
 #include <arch_helpers.h>
 #include <common/debug.h>
-#include <common/runtime_svc.h>
 #include <drivers/delay_timer.h>
 #include <lib/mmio.h>
 #include <lib/psci/psci.h>
+#include <lib/smccc.h>
 #include <lib/spinlock.h>
-#include <platform_def.h>
 #include <plat/common/platform.h>
 
 #include <gpc.h>
+#include <platform_def.h>
 
-#define FSL_SIP_CONFIG_GPC_MASK		0x00
-#define FSL_SIP_CONFIG_GPC_UNMASK	0x01
-#define FSL_SIP_CONFIG_GPC_SET_WAKE	0x02
-#define FSL_SIP_CONFIG_GPC_PM_DOMAIN	0x03
-#define FSL_SIP_CONFIG_GPC_SET_AFF	0x04
-#define FSL_SIP_CONFIG_GPC_CORE_WAKE	0x05
+#define FSL_SIP_CONFIG_GPC_MASK		U(0x00)
+#define FSL_SIP_CONFIG_GPC_UNMASK	U(0x01)
+#define FSL_SIP_CONFIG_GPC_SET_WAKE	U(0x02)
+#define FSL_SIP_CONFIG_GPC_PM_DOMAIN	U(0x03)
+#define FSL_SIP_CONFIG_GPC_SET_AFF	U(0x04)
+#define FSL_SIP_CONFIG_GPC_CORE_WAKE	U(0x05)
 
 #define MAX_HW_IRQ_NUM		U(128)
-#define MAX_DOMAIN_ID		U(10)
+#define MAX_IMR_NUM		U(4)
 
 #ifndef IMX_ANDROID_BUILD
 static uint32_t gpc_saved_imrs[16];
@@ -99,14 +99,19 @@ void imx_set_sys_wakeup(unsigned int last_core, bool pdn)
 {
 	unsigned int imr, core;
 
-	if (pdn)
-		for (imr = 0; imr < 4; imr++)
-			for (core = 0; core < 4; core++)
+	if (pdn) {
+		for (imr = 0U; imr < MAX_IMR_NUM; imr++) {
+			for (core = 0U; core < PLATFORM_CORE_COUNT; core++) {
 				gpc_save_imr_lpm(core, imr);
-	else
-		for (imr = 0; imr < 4; imr++)
-			for (core = 0; core < 4; core++)
+			}
+		}
+	} else {
+		for (imr = 0U; imr < MAX_IMR_NUM; imr++) {
+			for (core = 0U; core < PLATFORM_CORE_COUNT; core++) {
 				gpc_restore_imr_lpm(core, imr);
+			}
+		}
+	}
 }
 #endif
 
@@ -115,8 +120,9 @@ static void imx_gpc_hwirq_mask(unsigned int hwirq)
 	uintptr_t reg;
 	unsigned int val;
 
-	if (hwirq >= MAX_HW_IRQ_NUM)
+	if (hwirq >= MAX_HW_IRQ_NUM) {
 		return;
+	}
 
 	gpc_imr_core_spin_lock(0);
 	reg = gpc_imr_offset[0] + (hwirq / 32) * 4;
@@ -131,8 +137,9 @@ static void imx_gpc_hwirq_unmask(unsigned int hwirq)
 	uintptr_t reg;
 	unsigned int val;
 
-	if (hwirq >= MAX_HW_IRQ_NUM)
+	if (hwirq >= MAX_HW_IRQ_NUM) {
 		return;
+	}
 
 	gpc_imr_core_spin_lock(0);
 	reg = gpc_imr_offset[0] + (hwirq / 32) * 4;
@@ -142,12 +149,13 @@ static void imx_gpc_hwirq_unmask(unsigned int hwirq)
 	gpc_imr_core_spin_unlock(0);
 }
 
-static void imx_gpc_set_wake(uint32_t hwirq, unsigned int on)
+static void imx_gpc_set_wake(uint32_t hwirq, bool on)
 {
 	uint32_t mask, idx;
 
-	if (hwirq >= MAX_HW_IRQ_NUM)
+	if (hwirq >= MAX_HW_IRQ_NUM) {
 		return;
+	}
 
 	mask = 1 << hwirq % 32;
 	idx = hwirq / 32;
@@ -158,19 +166,23 @@ static void imx_gpc_set_wake(uint32_t hwirq, unsigned int on)
 static void imx_gpc_mask_irq0(uint32_t core_id, uint32_t mask)
 {
 	gpc_imr_core_spin_lock(core_id);
-	if (mask)
+	if (mask) {
 		mmio_setbits_32(gpc_imr_offset[core_id], 1);
-	else
+	} else {
 		mmio_clrbits_32(gpc_imr_offset[core_id], 1);
+	}
+
 	dsb();
 	gpc_imr_core_spin_unlock(core_id);
 }
 
 void imx_gpc_core_wake(uint32_t cpumask)
 {
-	for (int i = 0; i < 4; i++)
-		if (cpumask & (1 << i))
+	for (int i = 0; i < PLATFORM_CORE_COUNT; i++) {
+		if (cpumask & (1 << i)) {
 			imx_gpc_mask_irq0(i, false);
+		}
+	}
 }
 
 void imx_gpc_set_a53_core_awake(uint32_t core_id)
@@ -178,13 +190,15 @@ void imx_gpc_set_a53_core_awake(uint32_t core_id)
 	imx_gpc_mask_irq0(core_id, true);
 }
 
-static void imx_gpc_set_affinity(uint32_t hwirq, unsigned cpu_idx)
+static void imx_gpc_set_affinity(uint32_t hwirq, unsigned int cpu_idx)
 {
 	uintptr_t reg;
 	unsigned int val;
 
-	if (hwirq >= MAX_HW_IRQ_NUM || cpu_idx >= 4)
+	if (hwirq >= MAX_HW_IRQ_NUM || cpu_idx >= 4) {
 		return;
+	}
+
 	/*
 	 * using the mask/unmask bit as affinity function.unmask the
 	 * IMR bit to enable IRQ wakeup for this core.
@@ -197,7 +211,7 @@ static void imx_gpc_set_affinity(uint32_t hwirq, unsigned cpu_idx)
 	gpc_imr_core_spin_unlock(cpu_idx);
 
 	/* clear affinity of other core */
-	for (int i = 0; i < 4; i++) {
+	for (int i = 0; i < PLATFORM_CORE_COUNT; i++) {
 		if (cpu_idx != i) {
 			gpc_imr_core_spin_lock(i);
 			reg = gpc_imr_offset[i] + (hwirq / 32) * 4;
@@ -316,9 +330,9 @@ void imx_set_cluster_powerdown(unsigned int last_core, uint8_t power_state)
 	}
 }
 
-#define MAX_PLL_NUM	12
+#define MAX_PLL_NUM	U(12)
 
-struct pll_override imx8mq_pll[MAX_PLL_NUM] = {
+static const struct pll_override imx8mq_pll[MAX_PLL_NUM] = {
 	{.reg = 0x0, .override_mask = 0x140000, },
 	{.reg = 0x8, .override_mask = 0x140000, },
 	{.reg = 0x10, .override_mask = 0x140000, },
@@ -335,14 +349,17 @@ struct pll_override imx8mq_pll[MAX_PLL_NUM] = {
 
 void imx_anamix_override(bool enter)
 {
-	int i;
+	unsigned int i;
 
 	/* enable the pll override bit before entering DSM mode */
 	for (i = 0; i < MAX_PLL_NUM; i++) {
-		if (enter)
-			mmio_setbits_32(IMX_ANAMIX_BASE + imx8mq_pll[i].reg, imx8mq_pll[i].override_mask);
-		else
-			mmio_clrbits_32(IMX_ANAMIX_BASE + imx8mq_pll[i].reg, imx8mq_pll[i].override_mask);
+		if (enter) {
+			mmio_setbits_32(IMX_ANAMIX_BASE + imx8mq_pll[i].reg,
+				imx8mq_pll[i].override_mask);
+		} else {
+			mmio_clrbits_32(IMX_ANAMIX_BASE + imx8mq_pll[i].reg,
+				imx8mq_pll[i].override_mask);
+		}
 	}
 }
 
@@ -363,9 +380,6 @@ void imx_gpc_pm_domain_enable(uint32_t domain_id, bool on)
 	uint32_t val;
 	uintptr_t reg;
 
-	/* check if the domain_id is valid */
-	if (domain_id > MAX_DOMAIN_ID)
-		return;
 	/*
 	 * PCIE1 and PCIE2 share the same reset signal, if we power down
 	 * PCIE2, PCIE1 will be hold in reset too.
@@ -416,7 +430,7 @@ int imx_gpc_handler(uint32_t smc_fid,
 			  u_register_t x2,
 			  u_register_t x3)
 {
-	switch(x1) {
+	switch (x1) {
 	case FSL_SIP_CONFIG_GPC_PM_DOMAIN:
 		imx_gpc_pm_domain_enable(x2, x3);
 		break;
@@ -445,19 +459,22 @@ int imx_gpc_handler(uint32_t smc_fid,
 void imx_gpc_init(void)
 {
 	uint32_t val;
-	int i, j;
+	unsigned int i, j;
 
 	/* mask all the interrupt by default */
-	for (i = 0; i < 4; i++)
-		for (j = 0; j < 5; j++)
+	for (i = 0U; i < PLATFORM_CORE_COUNT; i++) {
+		for (j = 0U; j < ARRAY_SIZE(gpc_imr_offset); j++) {
 			mmio_write_32(gpc_imr_offset[j] + i * 4, ~0x0);
+		}
+	}
 
 	/* Due to the hardware design requirement, need to make
 	 * sure GPR interrupt(#32) is unmasked during RUN mode to
 	 * avoid entering DSM mode by mistake.
 	 */
-	for (i = 0; i < 4; i++)
+	for (i = 0U; i < PLATFORM_CORE_COUNT; i++) {
 		mmio_write_32(gpc_imr_offset[i], ~0x1);
+	}
 
 #ifndef IMX_ANDROID_BUILD
 	/* leave the IOMUX_GPC bit 12 on for core wakeup */
@@ -477,7 +494,7 @@ void imx_gpc_init(void)
 	/* set all mix/PU in A53 domain */
 	mmio_write_32(IMX_GPC_BASE + PGC_CPU_0_1_MAPPING, 0xfffd);
 
-	/* set SCU timming */
+	/* set SCU timing */
 	mmio_write_32(IMX_GPC_BASE + PGC_SCU_TIMING,
 		      (0x59 << 10) | 0x5B | (0x2 << 20));
 
@@ -496,7 +513,8 @@ void imx_gpc_init(void)
 	mmio_clrbits_32(IMX_SRC_BASE + SRC_OTG1PHY_SCR, 0x1);
 	mmio_clrbits_32(IMX_SRC_BASE + SRC_OTG2PHY_SCR, 0x1);
 
-	/* for USB OTG, the limitation are:
+	/*
+	 * for USB OTG, the limitation are:
 	 * 1. before system clock config, the IPG clock run at 12.5MHz, delay time
 	 *    should be longer than 82us.
 	 * 2. after system clock config, ipg clock run at 66.5MHz, delay time

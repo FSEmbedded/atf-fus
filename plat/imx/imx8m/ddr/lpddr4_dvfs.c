@@ -1,11 +1,12 @@
 /*
- * Copyright 2018 NXP
+ * Copyright 2018-2023 NXP
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <dram.h>
 #include <lib/mmio.h>
+
+#include <dram.h>
 
 static void lpddr4_mr_write(uint32_t mr_rank, uint32_t mr_addr, uint32_t mr_data)
 {
@@ -94,26 +95,26 @@ void lpddr4_swffc(struct dram_info *info, unsigned int init_fsp,
 		mmio_write_32(DDRC_DFILPCFG0(0), 0x0);
 		do {
 			val = mmio_read_32(DDRC_DFISTAT(0)); // dfi_lp_ack
-			val2= mmio_read_32(DDRC_STAT(0)); // operating_mode
+			val2 = mmio_read_32(DDRC_STAT(0)); // operating_mode
 		} while (((val & 0x2) == 0x2) && ((val2 & 0x7) == 3));
 	}
 #endif
 	/* 9. wait until in normal or power down states */
 	do {
 		/* operating_mode */
-		val= mmio_read_32(DDRC_STAT(0));
+		val = mmio_read_32(DDRC_STAT(0));
 	} while (((val & 0x7) != 1) && ((val & 0x7) != 2));
 
 	/* 10. Disable automatic derating: derate_enable */
-	val= mmio_read_32(DDRC_DERATEEN(0));
+	val = mmio_read_32(DDRC_DERATEEN(0));
 	derate_backup[0] = val;
 	mmio_clrbits_32(DDRC_DERATEEN(0), 0x1);
 
-	val= mmio_read_32(DDRC_FREQ1_DERATEEN(0));
+	val = mmio_read_32(DDRC_FREQ1_DERATEEN(0));
 	derate_backup[1] = val;
 	mmio_clrbits_32(DDRC_FREQ1_DERATEEN(0), 0x1);
 
-	val= mmio_read_32(DDRC_FREQ2_DERATEEN(0));
+	val = mmio_read_32(DDRC_FREQ2_DERATEEN(0));
 	derate_backup[2] = val;
 	mmio_clrbits_32(DDRC_FREQ2_DERATEEN(0), 0x1);
 
@@ -127,7 +128,7 @@ void lpddr4_swffc(struct dram_info *info, unsigned int init_fsp,
 
 	/* 13.Poll STAT.operating_mode is in "Normal" (001) or "Power-down" (010) */
 	do {
-		val= mmio_read_32(DDRC_STAT(0));
+		val = mmio_read_32(DDRC_STAT(0));
 	} while (((val & 0x7) != 1) && ((val & 0x7) != 2));
 
 	/* 14-15. trigger SW SR */
@@ -136,7 +137,7 @@ void lpddr4_swffc(struct dram_info *info, unsigned int init_fsp,
 
 	/* 16. Poll STAT.selfref_state in "Self Refresh 1" */
 	do {
-		val= mmio_read_32(DDRC_STAT(0));
+		val = mmio_read_32(DDRC_STAT(0));
 	} while ((val & 0x300) != 0x100);
 
 	/* 17. disable dq */
@@ -144,7 +145,7 @@ void lpddr4_swffc(struct dram_info *info, unsigned int init_fsp,
 
 	/* 18. Poll DBGCAM.wr_data_pipeline_empty and DBGCAM.rd_data_pipeline_empty */
 	do {
-		val  = mmio_read_32(DDRC_DBGCAM(0));
+		val = mmio_read_32(DDRC_DBGCAM(0));
 		val &= 0x30000000;
 	} while (val != 0x30000000);
 
@@ -157,7 +158,7 @@ void lpddr4_swffc(struct dram_info *info, unsigned int init_fsp,
 
 	/* 21. Poll STAT.selfref_state is in "SR Power down" */
 	do {
-		val= mmio_read_32(DDRC_STAT(0));
+		val = mmio_read_32(DDRC_STAT(0));
 	} while ((val & 0x300) != 0x200);
 
 	/* 22. set dfi_init_complete_en = 0 */
@@ -175,14 +176,14 @@ void lpddr4_swffc(struct dram_info *info, unsigned int init_fsp,
 
 	/* Q3: if refresh level is updated, then should program */
 	/* as updating refresh, need to toggle refresh_update_level signal */
-	val= mmio_read_32(DDRC_RFSHCTL3(0));
+	val = mmio_read_32(DDRC_RFSHCTL3(0));
 	val = val ^ 0x2;
 	mmio_write_32(DDRC_RFSHCTL3(0), val);
 
 	/* Q4: only for legacy PHY, so here can skipped */
 
 	/* dfi_frequency -> 0x1x */
-	val= mmio_read_32(DDRC_DFIMISC(0));
+	val = mmio_read_32(DDRC_DFIMISC(0));
 	val &= 0xFE;
 	val |= (fsp_index << 8);
 	mmio_write_32(DDRC_DFIMISC(0), val);
@@ -220,7 +221,7 @@ void lpddr4_swffc(struct dram_info *info, unsigned int init_fsp,
 	mmio_clrsetbits_32(DDRC_PWRCTL(0), 0x60, 0x40);
 	/* 30. Poll STAT.selfref_state in "Self refresh 2" */
 	do {
-		val= mmio_read_32(DDRC_STAT(0));
+		val = mmio_read_32(DDRC_STAT(0));
 	} while ((val & 0x300) != 0x300);
 
 	/* 31. change MR13.VRCG to normal */
@@ -235,8 +236,8 @@ void lpddr4_swffc(struct dram_info *info, unsigned int init_fsp,
 	mmio_setbits_32(DDRC_DBGCMD(0), 0x10);
 
 	do {
-		val= mmio_read_32(DDRC_DBGSTAT(0));
-	} while ((val & 0x10 ) != 0x0);
+		val = mmio_read_32(DDRC_DBGSTAT(0));
+	} while ((val & 0x10) != 0x0);
 
 	/* 33. Reset ZQCTL0.dis_srx_zqcl=0 */
 	if (fsp_index == 1)

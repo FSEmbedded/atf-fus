@@ -10,6 +10,7 @@
 #include <arch_helpers.h>
 #include <common/debug.h>
 #include <drivers/arm/gicv3.h>
+#include <drivers/delay_timer.h>
 #include <lib/mmio.h>
 #include <lib/psci/psci.h>
 
@@ -133,7 +134,7 @@ ps_apd_pwr_mode_cfgs_t apd_pwr_mode_cfgs = {
 	[DPD_PWR_MODE] = {
 		.swt_board_offs = 0x180,
 		.swt_mem_offs = 0x188,
-		.pmic_cfg = PMIC_CFG(0x23, 0xa, 0x2),
+		.pmic_cfg = PMIC_CFG(0x23, 0x0, 0x2),
 		.pad_cfg = PAD_CFG(0x0, 0xc, 0x01e80a02),
 		.bias_cfg = BIAS_CFG(0x0, 0x2, 0x2, 0x0),
 	},
@@ -142,8 +143,17 @@ ps_apd_pwr_mode_cfgs_t apd_pwr_mode_cfgs = {
 	[PD_PWR_MODE] = {
 		.swt_board_offs = 0x170,
 		.swt_mem_offs = 0x178,
-		.pmic_cfg = PMIC_CFG(0x23, 0x2, 0x2),
+		.pmic_cfg = PMIC_CFG(0x23, 0x0, 0x2),
 		.pad_cfg = PAD_CFG(0x0, 0xc, 0x01e80a00),
+		.bias_cfg = BIAS_CFG(0x0, 0x2, 0x2, 0x0),
+	},
+
+	/* DSL */
+	[DSL_PWR_MODE] = {
+		.swt_board_offs = 0x150,
+		.swt_mem_offs = 0x158,
+		.pmic_cfg = PMIC_CFG(0x23, 0x2, 0x2),
+		.pad_cfg = PAD_CFG(0x8, 0x4, 0x2),
 		.bias_cfg = BIAS_CFG(0x0, 0x2, 0x2, 0x0),
 	},
 
@@ -158,7 +168,7 @@ ps_apd_pwr_mode_cfgs_t apd_pwr_mode_cfgs = {
 	[ACT_PWR_MODE] = {
 		.swt_board_offs = 0x110,
 		.swt_mem_offs = 0x118,
-		.pmic_cfg = PMIC_CFG(0x23, 0x2, 0x2),
+		.pmic_cfg = PMIC_CFG(0x23, 0x0, 0x2),
 		.pad_cfg = PAD_CFG(0x0, 0x0, 0x0deb7a00),
 		.bias_cfg = BIAS_CFG(0x2, 0x2, 0x2, 0x0),
 	},
@@ -176,6 +186,12 @@ ps_apd_swt_cfgs_t apd_swt_cfgs = {
 		.swt_board[0] = SWT_BOARD(0x0, 0x00001fffc),
 		.swt_mem[0] = SWT_MEM(0x00010c00, 0x0, 0x1ffff),
 		.swt_mem[1] = SWT_MEM(0x003fffff, 0x003f0000, 0x0),
+	},
+
+	[DSL_PWR_MODE] = {
+		.swt_board[0] = SWT_BOARD(0x74, 0x74),
+		.swt_mem[0] = SWT_MEM(0x1ffff, 0x1ffff, 0x1ffff),
+		.swt_mem[1] = SWT_MEM(0x0, 0x0, 0x0),
 	},
 
 	[ADMA_PWR_MODE] = {
@@ -291,6 +307,9 @@ extern void imx_apd_ctx_save(unsigned int cpu);
 extern void imx_apd_ctx_restore(unsigned int cpu);
 extern void usb_wakeup_enable(bool enable);
 
+extern void dram_enter_self_refresh(void);
+extern void dram_exit_self_refresh(void);
+
 void imx_domain_suspend(const psci_power_state_t *target_state)
 {
 	unsigned int cpu = MPIDR_AFFLVL0_VAL(read_mpidr_el1());
@@ -304,7 +323,6 @@ void imx_domain_suspend(const psci_power_state_t *target_state)
 		mmio_write_32(IMX_SIM1_BASE + 0x3c + 0x4 * cpu, 0x7fffffe3);
 	} else {
 		/* for core standby/retention mode */
-		mmio_write_32(IMX_CMC1_BASE + 0x50 + 0x4 * cpu, 0x1);
 		mmio_write_32(IMX_SIM1_BASE + 0x3c + 0x4 * cpu, 0x7fffffe3);
 		dsb();
 		write_scr_el3(read_scr_el3() | SCR_FIQ_BIT);
@@ -358,9 +376,23 @@ void imx_domain_suspend(const psci_power_state_t *target_state)
 
 		/* save the AD domain context before entering PD mode */
 		imx_apd_ctx_save(cpu);
+	} else if (is_local_state_retn(SYSTEM_PWR_STATE(target_state))) {
+		/* only enable th necessary wakeup for DSL mode */
+		mmio_write_32(IMX_SIM1_BASE + 0x3c + 0x4 * cpu,
+			      BIT(14) | BIT(17) | BIT(20) | BIT(26) | BIT(27) | BIT(8) | BIT(6));
+
+		mmio_write_32(IMX_CMC1_BASE + 0x50 + 0x4 * cpu, 0x1);
+		mmio_write_32(IMX_CMC1_BASE + 0x10, 0x7);
+		mmio_write_32(IMX_CMC1_BASE + 0x20, 0x3);
+
+		imx_set_pwr_mode_cfg(DSL_PWR_MODE);
+		imx_set_pwr_mode_cfg(ADMA_PWR_MODE);
+		imx_set_pwr_mode_cfg(ACT_PWR_MODE);
+		dram_enter_self_refresh();
 	}
 }
 
+#define DRAM_LPM_STATUS		U(0x2802b004)
 extern void imx8ulp_init_scmi_server(void);
 void imx_domain_suspend_finish(const psci_power_state_t *target_state)
 {
@@ -389,6 +421,13 @@ void imx_domain_suspend_finish(const psci_power_state_t *target_state)
 
 		/* re-init the SCMI channel */
 		imx8ulp_init_scmi_server();
+	} else if (is_local_state_retn(SYSTEM_PWR_STATE(target_state))) {
+		dram_exit_self_refresh();
+	}
+
+	/* wait for DDR is ready when DDR is under the RTD side control for power saving */
+	while (mmio_read_32(DRAM_LPM_STATUS) != 0) {
+		;
 	}
 
 	/* clear cluster's LPM setting. */
@@ -451,8 +490,13 @@ void imx_get_sys_suspend_power_state(psci_power_state_t *req_state)
 {
 	unsigned int i;
 
-	for (i = IMX_PWR_LVL0; i <= PLAT_MAX_PWR_LVL; i++)
-		req_state->pwr_domain_state[i] = PLAT_POWER_DOWN_OFF_STATE;
+	for (i = IMX_PWR_LVL0; i <= PLAT_MAX_PWR_LVL; i++) {
+#if defined(IMX8ULP_DSL_SUPPORT)
+		req_state->pwr_domain_state[i] = PLAT_MAX_RET_STATE;
+#else
+		req_state->pwr_domain_state[i] = PLAT_MAX_OFF_STATE;
+#endif
+	}
 }
 
 extern void apd_io_pad_off(void);

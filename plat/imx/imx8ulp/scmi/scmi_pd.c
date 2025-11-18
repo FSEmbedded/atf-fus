@@ -1,8 +1,6 @@
 /*
  * Copyright 2021 NXP
  *
- * Peng Fan <peng.fan@nxp.com>
- *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 #include <stdlib.h>
@@ -283,7 +281,7 @@ static struct power_domain scmi_power_domains[] = {
 		.reg = IMX8ULP_PD_PXP,
 		.psw_parent = PS13,
 		.sram_parent = PS13,
-		.bits = SRAM_PXP,
+		.bits = SRAM_PXP | SRAM_EPDC,
 		.power_state = POWER_STATE_OFF,
 		.lpav = true,
 		.sw_rst_reg = PCC_PXP,

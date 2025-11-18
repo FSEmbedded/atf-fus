@@ -11,12 +11,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <assert.h>
 #include "caam.h"
 #include <common/debug.h>
 #include "jobdesc.h"
 #include "rsa.h"
 #include "sec_hw_specific.h"
-#include <assert.h>
 
 /* Return Length of desctiptr from first word */
 uint32_t desc_length(uint32_t *desc)
@@ -72,7 +72,11 @@ void desc_add_ptr(uint32_t *desc, phys_addr_t *ptr)
 #endif
 
 	/* Increase the length */
+#if defined(IMX_CAAM_32BIT)
+	desc[0] += (uint32_t) (sizeof(ptr_addr->low) / sizeof(uint32_t));
+#else
 	desc[0] += (uint32_t) (sizeof(phys_addr_t) / sizeof(uint32_t));
+#endif
 }
 
 /* Descriptor to generate Random words */

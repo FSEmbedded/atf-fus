@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2019, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015-2023, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -11,6 +11,8 @@
 #include <tools_share/uuid.h>
 #include <imx_sip_svc.h>
 #include <drivers/scmi-msg.h>
+
+#include <ele_api.h>
 
 static int32_t imx_sip_setup(void)
 {
@@ -56,7 +58,6 @@ static uintptr_t imx_sip_handler(unsigned int smc_fid,
 		return dram_dvfs_handler(smc_fid, handle, x1, x2, x3);
 	case IMX_SIP_HAB:
 		SMC_RET1(handle, imx_hab_handler(smc_fid, x1, x2, x3, x4));
-		break;
 	case IMX_SIP_NOC:
 		SMC_RET1(handle, imx_noc_handler(smc_fid, x1, x2, x3));
 		break;
@@ -69,9 +70,6 @@ static uintptr_t imx_sip_handler(unsigned int smc_fid,
 		break;
 	case IMX_SIP_SRC:
 		SMC_RET1(handle, imx_src_handler(smc_fid, x1, x2, x3, handle));
-		break;
-	case IMX_SIP_HAB:
-		SMC_RET1(handle, imx_hab_handler(smc_fid, x1, x2, x3, x4));
 		break;
 #endif
 #if (defined(PLAT_imx8qm) || defined(PLAT_imx8qx) || defined(PLAT_imx8dx) || defined(PLAT_imx8dxl))
@@ -88,12 +86,36 @@ static uintptr_t imx_sip_handler(unsigned int smc_fid,
 	case IMX_SIP_MISC_SET_TEMP:
 		SMC_RET1(handle, imx_misc_set_temp_handler(smc_fid, x1, x2, x3, x4));
 #endif
+#if defined(PLAT_imx8mm) || defined(PLAT_imx8mn) || defined(PLAT_imx8mp)
+	case IMX_SIP_HAB:
+		SMC_RET1(handle, imx_hab_handler(smc_fid, x1, x2, x3, x4));
+		break;
+#endif
 	case  IMX_SIP_BUILDINFO:
 		SMC_RET1(handle, imx_buildinfo_handler(smc_fid, x1, x2, x3, x4));
-#if defined(PLAT_imx93)
+#if defined(PLAT_imx93) || defined(PLAT_imx91)
+	case IMX_SIP_DDR_DVFS:
+		return dram_dvfs_handler(smc_fid, handle, x1, x2, x3);
+#endif
+#if defined(PLAT_imx93) || defined(PLAT_imx91) || defined(PLAT_imx95)
+	case IMX_SIP_GET_SOC_INFO:
+		return imx9_soc_info_handler(smc_fid, handle);
+#endif
+#if defined(PLAT_imx93) || defined(PLAT_imx95)
 	case IMX_SIP_SRC:
 		SMC_RET1(handle, imx_src_handler(smc_fid, x1, x2, x3, handle));
 		break;
+#endif
+#if defined(PLAT_imx95)
+	case IMX_SIP_LMM:
+		SMC_RET1(handle, imx_lmm_handler(smc_fid, x1, x2, x3, handle));
+		break;
+#endif
+#if defined(PLAT_imx8qm) && defined(SPD_trusty)
+	case IMX_SIP_CONFIGURE_MEM_FOR_VPU:
+		return imx_configure_memory_for_vpu(handle, x1);
+	case IMX_SIP_GET_PARTITION_NUMBER:
+		return imx_get_partition_number(handle);
 #endif
 	default:
 		WARN("Unimplemented i.MX SiP Service Call: 0x%x\n", smc_fid);

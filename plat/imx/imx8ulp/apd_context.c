@@ -268,6 +268,7 @@ void cgc1_restore(void)
 }
 
 static uint32_t tpm5[3];
+static uint32_t tpm6[3];
 
 void tpm5_save(void)
 {
@@ -281,6 +282,20 @@ void tpm5_restore(void)
 	mmio_write_32(0x29340010, tpm5[0]);
 	mmio_write_32(0x29340018, tpm5[1]);
 	mmio_write_32(0x29340020, tpm5[2]);
+}
+
+void tpm6_save(void)
+{
+	tpm6[0] = mmio_read_32(0x29820010);
+	tpm6[1] = mmio_read_32(0x29820018);
+	tpm6[2] = mmio_read_32(0x29820020);
+}
+
+void tpm6_restore(void)
+{
+	mmio_write_32(0x29820010, tpm6[0]);
+	mmio_write_32(0x29820018, tpm6[1]);
+	mmio_write_32(0x29820020, tpm6[2]);
 }
 
 static uint32_t wdog3[2];
@@ -347,6 +362,7 @@ bool is_lpav_owned_by_apd(void)
 void lpav_ctx_save(void)
 {
 	int i;
+	uint32_t val;
 
 	/* CGC2 save */
 	for (i = 0; i < ARRAY_SIZE(cgc2); i++)
@@ -357,11 +373,17 @@ void lpav_ctx_save(void)
 		pll4[i][1] = mmio_read_32(pll4[i][0]);
 
 	/* PCC5 save */
-	for (i = 0; i < ARRAY_SIZE(pcc5_0); i++)
-		pcc5_0[i] = mmio_read_32(IMX_PCC5_BASE + i * 4);
+	for (i = 0; i < ARRAY_SIZE(pcc5_0); i++) {
+		val = mmio_read_32(IMX_PCC5_BASE + i * 4);
+		if (val & PCC_PR)
+			pcc5_0[i] = val;
+	}
 
-	for (i = 0; i < ARRAY_SIZE(pcc5_1); i++)
-		pcc5_1[i][1] = mmio_read_32(pcc5_1[i][0]);
+	for (i = 0; i < ARRAY_SIZE(pcc5_1); i++) {
+		val = mmio_read_32(pcc5_1[i][0]);
+		if (val & PCC_PR)
+			pcc5_1[i][1] = val;
+	}
 
 	/* LPAV SIM save */
 	for (i = 0; i < ARRAY_SIZE(lpav_sim); i++)
@@ -398,11 +420,15 @@ void lpav_ctx_restore(void)
 		mmio_write_32(cgc2[i][0], cgc2[i][1]);
 
 	/* PCC5 restore */
-	for (i = 0; i < ARRAY_SIZE(pcc5_0); i++)
-		mmio_write_32(IMX_PCC5_BASE + i * 4, pcc5_0[i]);
+	for (i = 0; i < ARRAY_SIZE(pcc5_0); i++) {
+		if (pcc5_0[i] & PCC_PR)
+			mmio_write_32(IMX_PCC5_BASE + i * 4, pcc5_0[i]);
+	}
 
-	for (i = 0; i < ARRAY_SIZE(pcc5_1); i++)
-		mmio_write_32(pcc5_1[i][0], pcc5_1[i][1]);
+	for (i = 0; i < ARRAY_SIZE(pcc5_1); i++) {
+		if (pcc5_1[i][1] & PCC_PR)
+			mmio_write_32(pcc5_1[i][0], pcc5_1[i][1]);
+	}
 
 	/* LPAV_SIM */
 	for (i = 0; i < ARRAY_SIZE(lpav_sim); i++)
@@ -453,6 +479,10 @@ void imx_apd_ctx_save(unsigned int proc_num)
 	iomuxc_save();
 
 	tpm5_save();
+
+#if defined(IMX8ULP_TPM_TIMERS)
+	tpm6_save();
+#endif
 
 	lpuart_save();
 
@@ -512,11 +542,16 @@ void imx_apd_ctx_restore(unsigned int proc_num)
 
 	iomuxc_restore();
 
-	gpio_restore(apd_gpio_ctx, APD_GPIO_CTRL_NUM);
-
 	tpm5_restore();
 
+#if defined(IMX8ULP_TPM_TIMERS)
+	tpm6_restore();
+#endif
+
 	xrdc_reinit();
+
+	/* Restore GPIO after xrdc_reinit, otherwise MSCs are invalid */
+	gpio_restore(apd_gpio_ctx, APD_GPIO_CTRL_NUM);
 
 	/* restore the gic config */
 	plat_gic_restore(proc_num, &imx_gicv3_ctx);

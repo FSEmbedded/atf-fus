@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 NXP
+ * Copyright 2020-2022 NXP
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -25,6 +25,7 @@
 #include <imx_uart.h>
 #include <imx_rdc.h>
 #include <imx8m_caam.h>
+#include <imx8m_ccm.h>
 #include <imx8m_csu.h>
 #include <imx8m_snvs.h>
 #include <platform_def.h>
@@ -45,13 +46,14 @@
 static const mmap_region_t imx_mmap[] = {
 	GIC_MAP, AIPS_MAP, OCRAM_S_MAP, DDRC_MAP,
 	NOC_MAP, CAAM_RAM_MAP, NS_OCRAM_MAP,
-#ifdef SPD_trusty
-	DRAM2_MAP,
-#endif
 #ifdef IMX_SEPARATE_XLAT_TABLE
 	IMX_SEPARATE_NOBITS,
 #endif
-	ROM_MAP, DRAM_MAP, VPU_BLK_CTL_MAP, TCM_MAP, {0},
+#ifndef PLAT_XLAT_TABLES_DYNAMIC
+	DRAM_MAP,
+#endif
+	ROM_MAP, VPU_BLK_CTL_MAP, TCM_MAP,
+	{0},
 };
 
 static const struct aipstz_cfg aipstz[] = {
@@ -208,9 +210,8 @@ static void bl31_tzc380_setup(void)
 void bl31_early_platform_setup2(u_register_t arg0, u_register_t arg1,
 		u_register_t arg2, u_register_t arg3)
 {
-#if DEBUG_CONSOLE
+	unsigned int console_base = IMX_BOOT_UART_BASE;
 	static console_t console;
-#endif
 	unsigned int val;
 	int i;
 
@@ -230,13 +231,16 @@ void bl31_early_platform_setup2(u_register_t arg0, u_register_t arg1,
 	val = mmio_read_32(IMX_IOMUX_GPR_BASE + 0x2c);
 	mmio_write_32(IMX_IOMUX_GPR_BASE + 0x2c, val | 0x3DFF0000);
 
-	imx8m_caam_init();
-#if DEBUG_CONSOLE
-	console_imx_uart_register(IMX_BOOT_UART_BASE, IMX_BOOT_UART_CLK_IN_HZ,
+	if (console_base == 0U) {
+		console_base = imx8m_uart_get_base();
+	}
+
+	console_imx_uart_register(console_base, IMX_BOOT_UART_CLK_IN_HZ,
 		IMX_CONSOLE_BAUDRATE, &console);
 	/* This console is only used for boot stage */
 	console_set_scope(&console, CONSOLE_FLAG_BOOT);
-#endif
+
+	imx8m_caam_init();
 	/*
 	 * tell BL3-1 where the non-secure software image is located
 	 * and the entry state information.
@@ -278,24 +282,31 @@ void bl31_early_platform_setup2(u_register_t arg0, u_register_t arg1,
 #endif
 }
 
+#define MAP_BL31_TOTAL										   \
+	MAP_REGION_FLAT(BL31_START, BL31_SIZE, MT_MEMORY | MT_RW | MT_SECURE)
+#define MAP_BL31_RO										   \
+	MAP_REGION_FLAT(BL_CODE_BASE, BL_CODE_END - BL_CODE_BASE, MT_MEMORY | MT_RO | MT_SECURE)
+#define MAP_COHERENT_MEM									   \
+	MAP_REGION_FLAT(BL_COHERENT_RAM_BASE, BL_COHERENT_RAM_END - BL_COHERENT_RAM_BASE,	   \
+			MT_DEVICE | MT_RW | MT_SECURE)
+#define MAP_BL32_TOTAL										   \
+	MAP_REGION_FLAT(BL32_BASE, BL32_SIZE, MT_MEMORY | MT_RW)
 void bl31_plat_arch_setup(void)
 {
-	mmap_add_region(BL31_BASE, BL31_BASE, (BL31_LIMIT - BL31_BASE),
-		MT_MEMORY | MT_RW | MT_SECURE);
-	mmap_add_region(BL_CODE_BASE, BL_CODE_BASE, (BL_CODE_END - BL_CODE_BASE),
-		MT_MEMORY | MT_RO | MT_SECURE);
+	const mmap_region_t bl_regions[] = {
+		MAP_BL31_TOTAL,
+		MAP_BL31_RO,
 #if USE_COHERENT_MEM
-	mmap_add_region(BL_COHERENT_RAM_BASE, BL_COHERENT_RAM_BASE,
-		(BL_COHERENT_RAM_END - BL_COHERENT_RAM_BASE),
-		MT_DEVICE | MT_RW | MT_SECURE);
+		MAP_COHERENT_MEM,
 #endif
+#if defined(SPD_opteed) || defined(SPD_trusty)
+		/* Map TEE memory */
+		MAP_BL32_TOTAL,
+#endif
+		{0}
+	};
 
-	// Map TEE memory
-	mmap_add_region(BL32_BASE, BL32_BASE, BL32_SIZE, MT_MEMORY | MT_RW);
-
-	mmap_add(imx_mmap);
-
-	init_xlat_tables();
+	setup_page_tables(bl_regions, imx_mmap);
 
 	enable_mmu_el3(0);
 }
@@ -350,7 +361,8 @@ unsigned int plat_get_syscnt_freq2(void)
 }
 
 #ifdef SPD_trusty
-void plat_trusty_set_boot_args(aapcs64_params_t *args) {
+void plat_trusty_set_boot_args(aapcs64_params_t *args)
+{
 	args->arg0 = BL32_SIZE;
 	args->arg1 = BL32_BASE;
 	args->arg2 = TRUSTY_PARAMS_LEN_BYTES;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 NXP
+ * Copyright 2018-2023 NXP
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -14,6 +14,9 @@
 #define CCM_IP_CLK_ROOT_GEN_TAGET(i)		(IMX_CCM_IP_BASE + 0x80 * (i) + 0x00)
 #define CCM_IP_CLK_ROOT_GEN_TAGET_SET(i)	(IMX_CCM_IP_BASE + 0x80 * (i) + 0x04)
 #define CCM_IP_CLK_ROOT_GEN_TAGET_CLR(i)	(IMX_CCM_IP_BASE + 0x80 * (i) + 0x08)
+#define PLL_FREQ_800M	U(0x00ece580)
+#define PLL_FREQ_400M	U(0x00ec6984)
+#define PLL_FREQ_167M	U(0x00f5a406)
 
 void ddr_pll_bypass_100mts(void)
 {
@@ -59,13 +62,13 @@ void dram_pll_init(unsigned int drate)
 
 	switch (drate) {
 	case 3200:
-		mmio_write_32(HW_DRAM_PLL_CFG2, 0x00ece580);
+		mmio_write_32(HW_DRAM_PLL_CFG2, PLL_FREQ_800M);
 		break;
 	case 1600:
-		mmio_write_32(HW_DRAM_PLL_CFG2, 0x00ec6984);
+		mmio_write_32(HW_DRAM_PLL_CFG2, PLL_FREQ_400M);
 		break;
 	case 667:
-		mmio_write_32(HW_DRAM_PLL_CFG2, 0x00f5a406);
+		mmio_write_32(HW_DRAM_PLL_CFG2, PLL_FREQ_167M);
 		break;
 	default:
 		break;
@@ -73,8 +76,9 @@ void dram_pll_init(unsigned int drate)
 
 	/* unbypass the PLL */
 	mmio_clrbits_32(HW_DRAM_PLL_CFG0, 0x30);
-	while(!(mmio_read_32(HW_DRAM_PLL_CFG0) & BIT(31)))
+	while (!(mmio_read_32(HW_DRAM_PLL_CFG0) & BIT(31))) {
 		;
+	}
 }
 #else
 void dram_pll_init(unsigned int drate)
@@ -86,6 +90,10 @@ void dram_pll_init(unsigned int drate)
 	switch (drate) {
 	case 4000:
 		mmio_write_32(DRAM_PLL_CTRL + 0x4, (250 << 12) | (3 << 4) | 1);
+		break;
+	case 3733:
+	case 3732:
+		mmio_write_32(DRAM_PLL_CTRL + 0x4, (311 << 12) | (4 << 4) | 1);
 		break;
 	case 3200:
 		mmio_write_32(DRAM_PLL_CTRL + 0x4, (200 << 12) | (3 << 4) | 1);
@@ -108,8 +116,10 @@ void dram_pll_init(unsigned int drate)
 
 	mmio_setbits_32(DRAM_PLL_CTRL, BIT(9));
 	/* wait for PLL locked */
-	while (!(mmio_read_32(DRAM_PLL_CTRL) & BIT(31)))
+	while (!(mmio_read_32(DRAM_PLL_CTRL) & BIT(31))) {
 		;
+	}
+
 	/* unbypass the PLL */
 	mmio_clrbits_32(DRAM_PLL_CTRL, BIT(16));
 }

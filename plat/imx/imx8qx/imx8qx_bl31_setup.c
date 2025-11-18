@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015-2022, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -30,6 +30,9 @@
 #include <sec_rsrc.h>
 #include <imx_sip_svc.h>
 #include <string.h>
+#ifdef IMX_CAAM_ENABLE
+#include "caam.h"
+#endif
 
 #define TRUSTY_PARAMS_LEN_BYTES      (4096*2)
 int data_section_restore_flag = 0x1;
@@ -37,10 +40,6 @@ int data_section_restore_flag = 0x1;
 IMPORT_SYM(unsigned long, __RW_START__, BL31_RW_START);
 IMPORT_SYM(unsigned long, __DATA_START__, BL31_DATA_START);
 IMPORT_SYM(unsigned long, __DATA_END__, BL31_DATA_END);
-
-#if DEBUG_CONSOLE
-extern unsigned long console_list;
-#endif
 
 static entry_point_info_t bl32_image_ep_info;
 static entry_point_info_t bl33_image_ep_info;
@@ -55,6 +54,16 @@ static entry_point_info_t bl33_image_ep_info;
 #define IMX_RES_UART			SC_R_UART_0
 #define IMX_PAD_UART_RX			SC_P_UART0_RX
 #define IMX_PAD_UART_TX			SC_P_UART0_TX
+
+#elif defined(IMX_USE_UART1)
+#define UART_PAD_CTRL	(PADRING_IFMUX_EN_MASK | PADRING_GP_EN_MASK | \
+			(SC_PAD_CONFIG_OUT_IN << PADRING_CONFIG_SHIFT) | \
+			(SC_PAD_ISO_OFF << PADRING_LPCONFIG_SHIFT) | \
+			(SC_PAD_28FDSOI_DSE_DV_LOW << PADRING_DSE_SHIFT) | \
+			(SC_PAD_28FDSOI_PS_PD << PADRING_PULL_SHIFT))
+#define IMX_RES_UART			SC_R_UART_1
+#define IMX_PAD_UART_RX			SC_P_UART1_RX
+#define IMX_PAD_UART_TX			SC_P_UART1_TX
 
 /*
  * On Toradex Colibri i.MX8QXP UART3 on the FLEXCAN2.
@@ -421,8 +430,6 @@ void bl31_early_platform_setup2(u_register_t arg0, u_register_t arg1,
 
 #if DEBUG_CONSOLE
 	static console_t console;
-
-	console_list = 0;
 #endif
 	if (sc_ipc_open(&ipc_handle, SC_IPC_BASE) != SC_ERR_NONE)
 		panic();
@@ -458,12 +465,14 @@ void bl31_early_platform_setup2(u_register_t arg0, u_register_t arg1,
 	 */
 	imx8_partition_resources();
 
+#ifdef IMX_CAAM_ENABLE
+	sc_pm_set_resource_power_mode(ipc_handle, SC_R_CAAM_JR3, SC_PM_PW_MODE_ON);
+	sc_pm_set_resource_power_mode(ipc_handle, SC_R_CAAM_JR3_OUT, SC_PM_PW_MODE_ON);
 #ifdef SPD_trusty
 	sc_pm_set_resource_power_mode(ipc_handle, SC_R_CAAM_JR2, SC_PM_PW_MODE_ON);
 	sc_pm_set_resource_power_mode(ipc_handle, SC_R_CAAM_JR2_OUT, SC_PM_PW_MODE_ON);
-	sc_pm_set_resource_power_mode(ipc_handle, SC_R_CAAM_JR3, SC_PM_PW_MODE_ON);
-	sc_pm_set_resource_power_mode(ipc_handle, SC_R_CAAM_JR3_OUT, SC_PM_PW_MODE_ON);
 	sc_pm_set_resource_power_mode(ipc_handle, SC_R_MU_4A, SC_PM_PW_MODE_ON);
+#endif
 #endif
 
 	bl33_image_ep_info.pc = PLAT_NS_IMAGE_OFFSET;
@@ -487,6 +496,12 @@ void bl31_early_platform_setup2(u_register_t arg0, u_register_t arg1,
 #endif
 #endif
 	SET_SECURITY_STATE(bl33_image_ep_info.h.attr, NON_SECURE);
+#ifdef IMX_CAAM_ENABLE
+	/*
+	 * caam initialization
+	 */
+	sec_init(IMX_CAAM_BASE);
+#endif
 }
 
 void bl31_plat_arch_setup(void)

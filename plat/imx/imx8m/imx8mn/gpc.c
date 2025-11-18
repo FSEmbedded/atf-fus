@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2020 NXP
+ * Copyright 2019-2022 NXP
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -42,12 +42,11 @@ static unsigned int pu_domain_status;
 
 void imx_gpc_pm_domain_enable(uint32_t domain_id, bool on)
 {
-	struct imx_pwr_domain *pwr_domain;
-
-	if (domain_id >= ARRAY_SIZE(pu_domains))
+	if (domain_id > MIPI) {
 		return;
+	}
 
-	pwr_domain = &pu_domains[domain_id];
+	struct imx_pwr_domain *pwr_domain = &pu_domains[domain_id];
 
 	if (on) {
 		if (pwr_domain->need_sync) {
@@ -63,7 +62,9 @@ void imx_gpc_pm_domain_enable(uint32_t domain_id, bool on)
 			mmio_setbits_32(IMX_GPC_BASE + PU_PGC_UP_TRG, pwr_domain->pwr_req);
 
 			/* wait for power request done */
-			while (mmio_read_32(IMX_GPC_BASE + PU_PGC_UP_TRG) & pwr_domain->pwr_req);
+			while (mmio_read_32(IMX_GPC_BASE + PU_PGC_UP_TRG) & pwr_domain->pwr_req) {
+				;
+			}
 		}
 
 		if (domain_id == DISPMIX) {
@@ -80,14 +81,16 @@ void imx_gpc_pm_domain_enable(uint32_t domain_id, bool on)
 			mmio_setbits_32(IMX_GPC_BASE + GPC_PU_PWRHSK, pwr_domain->adb400_sync);
 
 			/* wait for adb power request ack */
-			while (!(mmio_read_32(IMX_GPC_BASE + GPC_PU_PWRHSK) & pwr_domain->adb400_ack))
+			while (!(mmio_read_32(IMX_GPC_BASE + GPC_PU_PWRHSK) & pwr_domain->adb400_ack)) {
 				;
+			}
 		}
 	} else {
 		pu_domain_status &= ~(1 << domain_id);
 
-		if (domain_id == OTG1)
+		if (domain_id == OTG1) {
 			return;
+		}
 
 		/* handle the ADB400 sync */
 		if (pwr_domain->need_sync) {
@@ -96,8 +99,9 @@ void imx_gpc_pm_domain_enable(uint32_t domain_id, bool on)
 			mmio_clrbits_32(IMX_GPC_BASE + GPC_PU_PWRHSK, pwr_domain->adb400_sync);
 
 			/* wait for adb power request ack */
-			while ((mmio_read_32(IMX_GPC_BASE + GPC_PU_PWRHSK) & pwr_domain->adb400_ack))
+			while ((mmio_read_32(IMX_GPC_BASE + GPC_PU_PWRHSK) & pwr_domain->adb400_ack)) {
 				;
+			}
 		}
 
 		/* HSIOMIX has no PU bit, so skip for it */
@@ -109,7 +113,9 @@ void imx_gpc_pm_domain_enable(uint32_t domain_id, bool on)
 			mmio_setbits_32(IMX_GPC_BASE + PU_PGC_DN_TRG, pwr_domain->pwr_req);
 
 			/* wait for power request done */
-			while (mmio_read_32(IMX_GPC_BASE + PU_PGC_DN_TRG) & pwr_domain->pwr_req);
+			while (mmio_read_32(IMX_GPC_BASE + PU_PGC_DN_TRG) & pwr_domain->pwr_req) {
+				;
+			}
 		}
 	}
 }
@@ -203,7 +209,7 @@ void imx_gpc_init(void)
 	/*
 	 * Set the CORE & SCU power up timing:
 	 * SW = 0x1, SW2ISO = 0x1;
-	 * the CPU CORE and SCU power up timming counter
+	 * the CPU CORE and SCU power up timing counter
 	 * is drived  by 32K OSC, each domain's power up
 	 * latency is (SW + SW2ISO) / 32768
 	 */

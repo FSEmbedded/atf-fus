@@ -17,11 +17,14 @@
 #include <lib/el3_runtime/context_mgmt.h>
 #include <lib/mmio.h>
 #include <sci/sci.h>
+#if defined(PLAT_imx8qm)
+#include <imx8qm_bl31_setup.h>
+#endif
 
 #if defined(PLAT_imx8qm) || defined(PLAT_imx8qx) || defined(PLAT_imx8dx) || defined(PLAT_imx8dxl)
 
 #ifdef PLAT_imx8qm
-const static int ap_cluster_index[PLATFORM_CLUSTER_COUNT] = {
+static const int ap_cluster_index[PLATFORM_CLUSTER_COUNT] = {
 #if (defined COCKPIT_A53)
 	SC_R_A53,
 #elif (defined COCKPIT_A72)
@@ -305,12 +308,26 @@ int imx_hifi_xrdc(uint32_t smc_fid)
 }
 #endif
 
-#if SC_CONSOLE
-int putchar(int c)
-{
-	if (ipc_handle)
-		sc_misc_debug_out(ipc_handle, (unsigned char)c);
-
-	return c;
+#if defined(PLAT_imx8qm) && defined(SPD_trusty)
+int imx_configure_memory_for_vpu(void *handle,
+				 u_register_t x1) {
+	int err;
+	err = configure_memory_region_owned_by_os_part(x1);
+	if (err == 0) {
+		SMC_RET1(handle, 0);
+	} else {
+		SMC_RET1(handle, 1);
+	}
 }
+int imx_get_partition_number(void *handle) {
+	int os_part, dpu_part;
+	int rc = get_partition_number(&os_part, &dpu_part);
+	if (!rc) {
+		SMC_RET3(handle, rc, os_part, dpu_part);
+	} else {
+		SMC_RET1(handle, rc);
+	}
+}
+
 #endif
+

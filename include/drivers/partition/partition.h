@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2018, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2016-2023, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -10,6 +10,8 @@
 #include <stdint.h>
 
 #include <lib/cassert.h>
+#include <drivers/partition/efi.h>
+#include <tools_share/uuid.h>
 
 #if !PLAT_PARTITION_MAX_ENTRIES
 # define PLAT_PARTITION_MAX_ENTRIES	128
@@ -27,12 +29,14 @@ CASSERT((PLAT_PARTITION_BLOCK_SIZE == 512) ||
 
 #define LEGACY_PARTITION_BLOCK_SIZE	512
 
-#define EFI_NAMELEN			36
+#define LBA(n) ((unsigned long long)(n) * PLAT_PARTITION_BLOCK_SIZE)
 
 typedef struct partition_entry {
 	uint64_t		start;
 	uint64_t		length;
 	char			name[EFI_NAMELEN];
+	struct efi_guid		part_guid;
+	struct efi_guid		type_guid;
 } partition_entry_t;
 
 typedef struct partition_entry_list {
@@ -42,7 +46,10 @@ typedef struct partition_entry_list {
 
 int load_partition_table(unsigned int image_id);
 const partition_entry_t *get_partition_entry(const char *name);
+const partition_entry_t *get_partition_entry_by_type(const uuid_t *type_guid);
+const partition_entry_t *get_partition_entry_by_uuid(const uuid_t *part_uuid);
 const partition_entry_list_t *get_partition_entry_list(void);
 void partition_init(unsigned int image_id);
+int gpt_partition_init(void);
 
 #endif /* PARTITION_H */

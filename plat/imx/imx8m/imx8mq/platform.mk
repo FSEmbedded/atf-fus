@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2018-2020, ARM Limited and Contributors. All rights reserved.
+# Copyright (c) 2018-2023, ARM Limited and Contributors. All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
 #
@@ -30,7 +30,7 @@ BL31_SOURCES		+=	plat/imx/common/imx8_helpers.S			\
 				plat/imx/imx8m/imx8mq/imx8mq_psci.c		\
 				plat/imx/imx8m/imx8mq/imx8mq_misc.c		\
 				plat/imx/imx8m/gpc_common.c			\
-				plat/imx/imx8m/hab.c				\
+				plat/imx/imx8m/imx_hab.c			\
 				plat/imx/imx8m/imx_aipstz.c			\
 				plat/imx/imx8m/imx_rdc.c			\
 				plat/imx/imx8m/imx8m_csu.c			\
@@ -61,6 +61,11 @@ IMX_SEPARATE_STACK :=		1
 
 $(eval $(call add_define,IMX_SEPARATE_XLAT_TABLE))
 $(eval $(call add_define,IMX_SEPARATE_STACK))
+
+ifeq (${SPD},trusty)
+IMX_SEPARATE_COHERENT_MEM :=	1
+$(eval $(call add_define,IMX_SEPARATE_COHERENT_MEM))
+endif
 
 ifneq (${IMX_ANDROID_BUILD},true)
 $(eval $(call add_define,IMX8M_DDR4_DVFS))

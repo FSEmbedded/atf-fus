@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2021, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2016-2023, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -16,8 +16,10 @@
 #define MIDR_IMPL_SHIFT		U(24)
 #define MIDR_VAR_SHIFT		U(20)
 #define MIDR_VAR_BITS		U(4)
+#define MIDR_VAR_MASK		U(0xf)
 #define MIDR_REV_SHIFT		U(0)
 #define MIDR_REV_BITS		U(4)
+#define MIDR_REV_MASK		U(0xf)
 #define MIDR_PN_MASK		U(0xfff)
 #define MIDR_PN_SHIFT		U(4)
 
@@ -102,7 +104,11 @@
 /* CSSELR definitions */
 #define LEVEL_SHIFT		U(1)
 
-/* ID_DFR0_EL1 definitions */
+/* ID_DFR0 definitions */
+#define ID_DFR0_PERFMON_SHIFT		U(24)
+#define ID_DFR0_PERFMON_MASK		U(0xf)
+#define ID_DFR0_PERFMON_PMUV3		U(3)
+#define ID_DFR0_PERFMON_PMUV3P5		U(6)
 #define ID_DFR0_COPTRC_SHIFT		U(12)
 #define ID_DFR0_COPTRC_MASK		U(0xf)
 #define ID_DFR0_COPTRC_SUPPORTED	U(1)
@@ -116,11 +122,20 @@
 #define ID_DFR1_MTPMU_SHIFT	U(0)
 #define ID_DFR1_MTPMU_MASK	U(0xf)
 #define ID_DFR1_MTPMU_SUPPORTED	U(1)
+#define ID_DFR1_MTPMU_DISABLED	U(15)
+
+/* ID_MMFR3 definitions */
+#define ID_MMFR3_PAN_SHIFT	U(16)
+#define ID_MMFR3_PAN_MASK	U(0xf)
 
 /* ID_MMFR4 definitions */
 #define ID_MMFR4_CNP_SHIFT	U(12)
 #define ID_MMFR4_CNP_LENGTH	U(4)
 #define ID_MMFR4_CNP_MASK	U(0xf)
+
+#define ID_MMFR4_CCIDX_SHIFT	U(24)
+#define ID_MMFR4_CCIDX_LENGTH	U(4)
+#define ID_MMFR4_CCIDX_MASK	U(0xf)
 
 /* ID_PFR0 definitions */
 #define ID_PFR0_AMU_SHIFT	U(20)
@@ -174,7 +189,7 @@
 #define SCTLR_AFE_BIT		(U(1) << 29)
 #define SCTLR_TE_BIT		(U(1) << 30)
 #define SCTLR_DSSBS_BIT		(U(1) << 31)
-#define SCTLR_RESET_VAL         (SCTLR_RES1 | SCTLR_NTWE_BIT |		\
+#define SCTLR_RESET_VAL		(SCTLR_RES1 | SCTLR_NTWE_BIT |		\
 				SCTLR_NTWI_BIT | SCTLR_CP15BEN_BIT)
 
 /* SDCR definitions */
@@ -182,11 +197,11 @@
 #define SDCR_SPD_LEGACY		U(0x0)
 #define SDCR_SPD_DISABLE	U(0x2)
 #define SDCR_SPD_ENABLE		U(0x3)
-#define SDCR_SCCD_BIT		(U(1) << 23)
-#define SDCR_TTRF_BIT		(U(1) << 19)
 #define SDCR_SPME_BIT		(U(1) << 17)
-#define SDCR_RESET_VAL		U(0x0)
+#define SDCR_TTRF_BIT		(U(1) << 19)
+#define SDCR_SCCD_BIT		(U(1) << 23)
 #define SDCR_MTPME_BIT		(U(1) << 28)
+#define SDCR_RESET_VAL		U(0x0)
 
 /* HSCTLR definitions */
 #define HSCTLR_RES1	((U(1) << 29) | (U(1) << 28) | (U(1) << 23) | \
@@ -260,7 +275,7 @@
 #define TCP10_BIT		(U(1) << 10)
 #define HCPTR_RESET_VAL		HCPTR_RES1
 
-/* VTTBR defintions */
+/* VTTBR definitions */
 #define VTTBR_RESET_VAL		ULL(0x0)
 #define VTTBR_VMID_MASK		ULL(0xff)
 #define VTTBR_VMID_SHIFT	U(48)
@@ -295,7 +310,7 @@
 #define CPACR_CP10_SHIFT	U(20)
 #define CPACR_ENABLE_FP_ACCESS	((U(0x3) << CPACR_CP11_SHIFT) |\
 				 (U(0x3) << CPACR_CP10_SHIFT))
-#define CPACR_RESET_VAL         U(0x0)
+#define CPACR_RESET_VAL		U(0x0)
 
 /* FPEXC definitions */
 #define FPEXC_RES1		((U(1) << 10) | (U(1) << 9) | (U(1) << 8))
@@ -454,6 +469,10 @@
 #define PMCR_LP_BIT		(U(1) << 7)
 #define PMCR_LC_BIT		(U(1) << 6)
 #define PMCR_DP_BIT		(U(1) << 5)
+#define PMCR_X_BIT		(U(1) << 4)
+#define PMCR_C_BIT		(U(1) << 2)
+#define PMCR_P_BIT		(U(1) << 1)
+#define PMCR_E_BIT		(U(1) << 0)
 #define	PMCR_RESET_VAL		U(0x0)
 
 /*******************************************************************************
@@ -495,13 +514,13 @@
 #define CNTP_CTL		U(0x2c)
 
 /* Physical timer control register bit fields shifts and masks */
-#define CNTP_CTL_ENABLE_SHIFT   0
-#define CNTP_CTL_IMASK_SHIFT    1
-#define CNTP_CTL_ISTATUS_SHIFT  2
+#define CNTP_CTL_ENABLE_SHIFT	0
+#define CNTP_CTL_IMASK_SHIFT	1
+#define CNTP_CTL_ISTATUS_SHIFT	2
 
-#define CNTP_CTL_ENABLE_MASK    U(1)
-#define CNTP_CTL_IMASK_MASK     U(1)
-#define CNTP_CTL_ISTATUS_MASK   U(1)
+#define CNTP_CTL_ENABLE_MASK	U(1)
+#define CNTP_CTL_IMASK_MASK	U(1)
+#define CNTP_CTL_ISTATUS_MASK	U(1)
 
 /* MAIR macros */
 #define MAIR0_ATTR_SET(attr, index)	((attr) << ((index) << U(3)))
@@ -527,6 +546,7 @@
 #define DCISW		p15, 0, c7, c6, 2
 #define CTR		p15, 0, c0, c0, 1
 #define CNTFRQ		p15, 0, c14, c0, 0
+#define ID_MMFR3	p15, 0, c0, c1, 7
 #define ID_MMFR4	p15, 0, c0, c2, 6
 #define ID_DFR0		p15, 0, c0, c1, 2
 #define ID_DFR1		p15, 0, c0, c3, 5
@@ -559,6 +579,7 @@
 #define CLIDR		p15, 1, c0, c0, 1
 #define CSSELR		p15, 2, c0, c0, 0
 #define CCSIDR		p15, 1, c0, c0, 0
+#define CCSIDR2		p15, 1, c0, c0, 2
 #define HTCR		p15, 4, c2, c0, 2
 #define HMAIR0		p15, 4, c10, c2, 0
 #define ATS1CPR		p15, 0, c7, c8, 0
@@ -611,6 +632,12 @@
 #define ICC_SGI1R_EL1_64	p15, 0, c12
 #define ICC_ASGI1R_EL1_64	p15, 1, c12
 #define ICC_SGI0R_EL1_64	p15, 2, c12
+
+/* Fault registers. The format is: coproc, opt1, CRn, CRm, opt2 */
+#define DFSR		p15, 0, c5, c0, 0
+#define IFSR		p15, 0, c5, c0, 1
+#define DFAR		p15, 0, c6, c0, 0
+#define IFAR		p15, 0, c6, c0, 2
 
 /*******************************************************************************
  * Definitions of MAIR encodings for device and normal memory
@@ -769,5 +796,6 @@
 #define DSU_CLUSTER_PWR_OFF	0
 #define DSU_CLUSTER_PWR_ON	1
 #define DSU_CLUSTER_PWR_MASK	U(1)
+#define DSU_CLUSTER_MEM_RET	BIT(1)
 
 #endif /* ARCH_H */

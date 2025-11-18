@@ -89,20 +89,20 @@ struct xrdc_mrc_config imx8ulp_mrc[] = {
 #endif
 
 #ifdef SPD_trusty
-	{ 6, 0, DRAM_MEM_0_START, DRAM_MEM_0_SIZE, {1, 1, 0, 2, 1, 0, 1, 0}, {0xfff, 0x93f} }, /* DRAM for LPAV and RTD*/
-	{ 6, 1, DRAM_MEM_1_START, DRAM_MEM_1_SIZE, {1, 1, 0, 1, 1, 0, 1, 0}, {0xfc0, 0} }, /* TEE DRAM for LPAV and RTD*/
-	{ 6, 2, DRAM_MEM_2_START, DRAM_MEM_2_SIZE, {1, 1, 0, 2, 1, 0, 1, 0}, {0xfff, 0x93f} }, /* DRAM for LPAV and RTD*/
-	{ 6, 3, DRAM_MEM_3_START, DRAM_MEM_3_SIZE, {1, 1, 0, 1, 1, 0, 1, 0}, {0xfc0, 0} }, /* DRAM for LPAV and RTD*/
-	{ 6, 4, DRAM_MEM_4_START, DRAM_MEM_4_SIZE, {1, 1, 0, 2, 1, 0, 1, 0}, {0xfff, 0x93f} }, /* DRAM for LPAV and RTD*/
+	{ 6, 0, DRAM_MEM_0_START, DRAM_MEM_0_SIZE, {1, 1, 0, 2, 1, 0, 1, 1}, {0xfff, 0x93f} }, /* DRAM for LPAV and RTD*/
+	{ 6, 1, DRAM_MEM_1_START, DRAM_MEM_1_SIZE, {1, 1, 0, 1, 1, 0, 1, 1}, {0xfc0, 0} }, /* TEE DRAM for LPAV and RTD*/
+	{ 6, 2, DRAM_MEM_2_START, DRAM_MEM_2_SIZE, {1, 1, 0, 2, 1, 0, 1, 1}, {0xfff, 0x93f} }, /* DRAM for LPAV and RTD*/
+	{ 6, 3, DRAM_MEM_3_START, DRAM_MEM_3_SIZE, {1, 1, 0, 1, 1, 0, 1, 1}, {0xfc0, 0} }, /* DRAM for LPAV and RTD*/
+	{ 6, 4, DRAM_MEM_4_START, DRAM_MEM_4_SIZE, {1, 1, 0, 2, 1, 0, 1, 1}, {0xfff, 0x93f} }, /* DRAM for LPAV and RTD*/
 #else
-	{ 6, 0, DRAM_MEM_0_START, DRAM_MEM_0_SIZE, {1, 1, 0, 1, 1, 0, 1, 0}, {0xfff, 0} }, /* DRAM for LPAV and RTD*/
-	{ 6, 1, DRAM_MEM_1_START, DRAM_MEM_1_SIZE, {1, 1, 0, 1, 1, 0, 1, 0}, {0xfc0, 0} }, /* TEE DRAM for LPAV and RTD*/
-	{ 6, 2, DRAM_MEM_2_START, DRAM_MEM_2_SIZE, {1, 1, 0, 1, 1, 0, 1, 0}, {0xfff, 0} }, /* DRAM for LPAV and RTD*/
+	{ 6, 0, DRAM_MEM_0_START, DRAM_MEM_0_SIZE, {1, 1, 0, 1, 1, 0, 1, 1}, {0xfff, 0} }, /* DRAM for LPAV and RTD*/
+	{ 6, 1, DRAM_MEM_1_START, DRAM_MEM_1_SIZE, {1, 1, 0, 1, 1, 0, 1, 1}, {0xfc0, 0} }, /* TEE DRAM for LPAV and RTD*/
+	{ 6, 2, DRAM_MEM_2_START, DRAM_MEM_2_SIZE, {1, 1, 0, 1, 1, 0, 1, 1}, {0xfff, 0} }, /* DRAM for LPAV and RTD*/
 #endif
 #else
 	{ 4, 0, 0x80000000, 0x80000000, {0, 1, 0, 0, 0, 0, 0, 1}, {0xfff, 0} }, /* DRAM for A35, DMA1, USDHC0*/
 	{ 5, 0, 0x80000000, 0x80000000, {0, 1, 0, 0, 0, 0, 0, 0}, {0xfff, 0} }, /* DRAM for NIC_PER */
-	{ 6, 0, 0x80000000, 0x80000000, {1, 1, 0, 1, 1, 0, 1, 0}, {0xfff, 0} }, /* DRAM for LPAV and RTD*/
+	{ 6, 0, 0x80000000, 0x80000000, {1, 1, 0, 1, 1, 0, 1, 1}, {0xfff, 0} }, /* DRAM for LPAV and RTD*/
 #endif
 	{ 7, 0, 0x80000000, 0x10000000, {0, 0, 1, 0, 0, 0, 0, 0}, {0xfff, 0} }, /* DRAM for HIFI4 */
 	{ 7, 1, 0x90000000, 0x10000000, {0, 0, 1, 0, 0, 0, 0, 0}, {0xfff, 0} }, /* DRAM for HIFI4 */
@@ -116,13 +116,15 @@ struct xrdc_mrc_config imx8ulp_mrc[] = {
 
 struct xrdc_pac_msc_config imx8ulp_pdac[] = {
 	{ 0, PAC_SLOT_ALL, {0, 7, 0, 0, 0, 0, 0, 7} }, /* PAC0 */
+	{ 0, 44, {0, 7, 7, 0, 0, 0, 0, 7} }, /* PAC0 slot 44 for CGC1 */
 	{ 0, 36, {0, 0, 0, 0, 0, 0, 7, 7} }, /* PAC0 slot 36 for CMC1 */
 	{ 0, 41, {0, 0, 0, 0, 0, 0, 7, 7} }, /* PAC0 slot 41 for SIM_AD */
 	{ 1, PAC_SLOT_ALL, {0, 7, 0, 0, 0, 0, 0, 7} }, /* PAC1 */
-	{ 1, 0, {0, 7, 0, 0, 0, 0, 7, 7} }, /* PAC1 slot 0 for PCC4 */
+	{ 1, 0, {0, 7, 7, 0, 0, 0, 7, 7} }, /* PAC1 slot 0 for PCC4 */
 	{ 1, 6, {0, 7, 7, 0, 0, 0, 0, 7} }, /* PAC1 slot 6 for LPUART6 */
+	{ 1, 7, {0, 7, 7, 0, 0, 0, 0, 7} }, /* PAC1 slot 7 for LPUART7 */
 	{ 1, 9,  {0, 7, 7, 7, 0, 0, 0, 7} }, /* SAI5 for HIFI4 and eDMA2 */
-	{ 1, 12, {0, 7, 0, 0, 0, 0, 7, 7} }, /* PAC1 slot 12 for IOMUXC1 */
+	{ 1, 12, {0, 7, 7, 0, 0, 0, 7, 7} }, /* PAC1 slot 12 for IOMUXC1 */
 	{ 2, PAC_SLOT_ALL, {7, 7, 7, 7, 0, 0, 7, 7} }, /* PAC2 */
 };
 

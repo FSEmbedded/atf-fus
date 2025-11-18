@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2018-2023, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -41,7 +41,7 @@ int imx_validate_ns_entrypoint(uintptr_t ns_entrypoint)
 int imx_pwr_domain_on(u_register_t mpidr)
 {
 	unsigned int core_id;
-	uint64_t base_addr = BL31_BASE;
+	uint64_t base_addr = BL31_START;
 
 	core_id = MPIDR_AFFLVL0_VAL(mpidr);
 
@@ -103,7 +103,7 @@ void imx_cpu_standby(plat_local_state_t cpu_state)
 
 void imx_domain_suspend(const psci_power_state_t *target_state)
 {
-	uint64_t base_addr = BL31_BASE;
+	uint64_t base_addr = BL31_START;
 	uint64_t mpidr = read_mpidr_el1();
 	unsigned int core_id = MPIDR_AFFLVL0_VAL(mpidr);
 
@@ -248,24 +248,12 @@ int imx_system_reset2(int is_vendor, int reset_type, u_register_t cookie)
 
 void __dead2 imx_system_off(void)
 {
-#if 1
-	/*
-	 * 2024-02-27 F&S:
-	 * Do not blindly activate the alarm; if the alarm is not set in the
-	 * rtc-snvs in Linux, the alarm is already triggered (Bit LPTA in
-	 * SNVS_LPSR is set) due to a match of alarm time and real time
-	 * counter at value 0 when powering up. Then the board will
-	 * immediately wake up again after power off. Actually ignore the
-	 * alarm bits here, they are set by rtc-snvs already. Simply add the
-	 * bits for the real time counter RTC and for the power switching.
-	 */
-	mmio_setbits_32(IMX_SNVS_BASE + SNVS_LPCR,
-			SNVS_LPCR_SRTC_ENV | SNVS_LPCR_DP_EN | SNVS_LPCR_TOP);
-#else
-	/* NXP: unconditionally activate alarm and RTC and switch off power */
-	mmio_write_32(IMX_SNVS_BASE + SNVS_LPCR, SNVS_LPCR_SRTC_ENV |
-			SNVS_LPCR_DP_EN | SNVS_LPCR_TOP | SNVS_LPCR_LPTA_EN | SNVS_LPCR_LPWUI_EN);
-#endif
+	uint32_t val;
+
+	val = mmio_read_32(IMX_SNVS_BASE + SNVS_LPCR);
+	val |= SNVS_LPCR_SRTC_ENV | SNVS_LPCR_DP_EN | SNVS_LPCR_TOP;
+	mmio_write_32(IMX_SNVS_BASE + SNVS_LPCR, val);
+
 
 	while (1)
 		;

@@ -1,10 +1,11 @@
 /*
- * Copyright (c) 2018-2019, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2018-2022, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #include <lib/utils_def.h>
+#include <plat/common/common_def.h>
 
 #define PLATFORM_LINKER_FORMAT		"elf64-littleaarch64"
 #define PLATFORM_LINKER_ARCH		aarch64
@@ -33,7 +34,8 @@
 #define PLAT_STOP_OFF_STATE		U(3)
 
 #define BL31_BASE			U(0x910000)
-#define BL31_LIMIT			U(0x920000)
+#define BL31_SIZE			SZ_64K
+#define BL31_LIMIT			(BL31_BASE + BL31_SIZE)
 
 /* non-secure uboot base */
 #define PLAT_NS_IMAGE_OFFSET		U(0x40200000)
@@ -132,7 +134,7 @@
 #define SNVS_LPCR_DP_EN			BIT(5)
 #define SNVS_LPCR_TOP			BIT(6)
 
-#define SAVED_DRAM_TIMING_BASE		0x40000000
+#define SAVED_DRAM_TIMING_BASE		U(0x40000000)
 
 #define HW_DRAM_PLL_CFG0		(IMX_ANAMIX_BASE + 0x60)
 #define HW_DRAM_PLL_CFG1		(IMX_ANAMIX_BASE + 0x64)
@@ -147,13 +149,11 @@
 #define OCRAM_S_SIZE			U(0x8000)
 #define OCRAM_S_LIMIT			(OCRAM_S_BASE + OCRAM_S_SIZE)
 
+#define COUNTER_FREQUENCY		8333333 /* 25MHz / 3 */
 #define IMX_SEPARATE_NOBITS_BASE 	OCRAM_S_BASE
 #define IMX_SEPARATE_NOBITS_LIMIT	OCRAM_S_LIMIT
-
-#define IMX_SCTR_BASE			0x306c0000
-#define CNTFID0_OFF			U(0x20)
-#define CNTFID1_OFF			U(0x24)
-#define COUNTER_FREQUENCY		8000000 /* 8MHz */
+#define IMX_SEPARATE_COHERENT_MEM_BASE  U(0x90E000)
+#define IMX_SEPARATE_COHERENT_MEM_LIMIT U(0x90F000)
 
 #define DEBUG_CONSOLE			0
 

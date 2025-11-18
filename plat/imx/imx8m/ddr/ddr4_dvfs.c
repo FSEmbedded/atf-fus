@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 NXP
+ * Copyright 2018-2023 NXP
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -30,8 +30,9 @@ void ddr4_mr_write(uint32_t mr, uint32_t data, uint32_t mr_type,
 	mmio_setbits_32(DDRC_MRCTRL0(0), BIT(31));
 
 	do {
-		while (mmio_read_32(DDRC_MRSTAT(0)) & 0x1)
+		while (mmio_read_32(DDRC_MRSTAT(0)) & 0x1) {
 			;
+		}
 
 	} while (mmio_read_32(DDRC_MRSTAT(0)) & 0x1);
 
@@ -42,21 +43,22 @@ void ddr4_mr_write(uint32_t mr, uint32_t data, uint32_t mr_type,
 	val = mmio_read_32(DDRC_DIMMCTL(0));
 	if ((val & 0x2) && (rank == 0x2)) {
 		mr_mirror = (mr & 0x4) | ((mr & 0x1) << 1) | ((mr & 0x2) >> 1); /* BA0, BA1 swap */
-		if (dram_type == DDRC_DDR4)
+		if (dram_type == DDRC_DDR4) {
 			data_mirror = (data & 0x1607) | ((data & 0x8) << 1) | ((data & 0x10) >> 1) |
 				((data & 0x20) << 1) | ((data & 0x40) >> 1) | ((data & 0x80) << 1) |
 				((data & 0x100) >> 1) | ((data & 0x800) << 2) | ((data & 0x2000) >> 2) ;
-		else
+		} else {
 			data_mirror = (data & 0xfe07) | ((data & 0x8) << 1) | ((data & 0x10) >> 1) |
 				 ((data & 0x20) << 1) | ((data & 0x40) >> 1) | ((data & 0x80) << 1) |
-				 ((data & 0x100)>>1);
+				 ((data & 0x100) >> 1);
+		}
 	} else {
 		mr_mirror = mr;
 		data_mirror = data;
 	}
 
-	mmio_write_32(DDRC_MRCTRL0(0), mr_type | (mr_mirror << 12) | (rank << 4) );
-	mmio_write_32(DDRC_MRCTRL1(0), data_mirror );
+	mmio_write_32(DDRC_MRCTRL0(0), mr_type | (mr_mirror << 12) | (rank << 4));
+	mmio_write_32(DDRC_MRCTRL1(0), data_mirror);
 
 	/*
 	 * 3. In a separate APB transaction, write the MRCTRL0.mr_wr to 1.
@@ -67,8 +69,9 @@ void ddr4_mr_write(uint32_t mr, uint32_t data, uint32_t mr_type,
 	 */
 	mmio_setbits_32(DDRC_MRCTRL0(0), BIT(31));
 
-	while (mmio_read_32(DDRC_MRSTAT(0)))
+	while (mmio_read_32(DDRC_MRSTAT(0))) {
 		;
+	}
 }
 
 void dram_cfg_all_mr(struct dram_info *info, uint32_t pstate)
@@ -82,9 +85,9 @@ void dram_cfg_all_mr(struct dram_info *info, uint32_t pstate)
 	 */
 
 	for (int i = 1; i <= num_rank; i++) {
-		for (int j = 0; j < 6; j++)
+		for (int j = 0; j < 6; j++) {
 			ddr4_mr_write(j, info->mr_table[pstate][j], 0, i, dram_type);
-
+		}
 		ddr4_mr_write(6, info->mr_table[pstate][7], 0, i, dram_type);
 	}
 }
@@ -108,10 +111,12 @@ void sw_pstate(uint32_t pstate, uint32_t drate)
 	 * to the refresh logic.
 	 */
 	val = mmio_read_32(DDRC_RFSHCTL3(0));
-	if (val & 0x2)
+	if (val & 0x2) {
 		mmio_write_32(DDRC_RFSHCTL3(0), val & 0xFFFFFFFD);
-	else
+	} else {
 		mmio_write_32(DDRC_RFSHCTL3(0), val | 0x2);
+	}
+
 	/*
 	 * 19. If required, trigger the initialization in the PHY.
 	 * If using the gen2 multiPHY, PLL initialization should
@@ -122,8 +127,9 @@ void sw_pstate(uint32_t pstate, uint32_t drate)
 	mmio_write_32(DDRC_DFIMISC(0), 0x00000020 | (pstate << 8));
 
 	/* wait DFISTAT.dfi_init_complete to 0 */
-	while (mmio_read_32(DDRC_DFISTAT(0)) & 0x1)
+	while (mmio_read_32(DDRC_DFISTAT(0)) & 0x1) {
 		;
+	}
 
 	/* change the clock to the target frequency */
 	dram_clock_switch(drate, false);
@@ -131,8 +137,9 @@ void sw_pstate(uint32_t pstate, uint32_t drate)
 	mmio_write_32(DDRC_DFIMISC(0), 0x00000000 | (pstate << 8));
 
 	/* wait DFISTAT.dfi_init_complete to 1 */
-	while (!(mmio_read_32(DDRC_DFISTAT(0)) & 0x1))
+	while (!(mmio_read_32(DDRC_DFISTAT(0)) & 0x1)) {
 		;
+	}
 
 	/*
 	 * When changing frequencies the controller may violate the JEDEC
@@ -146,8 +153,9 @@ void sw_pstate(uint32_t pstate, uint32_t drate)
 	/* 14. Exit the self-refresh state by setting PWRCTL.selfref_sw = 0. */
 	mmio_clrbits_32(DDRC_PWRCTL(0), (1 << 5));
 
-	while ((mmio_read_32(DDRC_STAT(0)) & 0x3f) == 0x23)
+	while ((mmio_read_32(DDRC_STAT(0)) & 0x3f) == 0x23) {
 		;
+	}
 }
 
 void ddr4_swffc(struct dram_info *info, unsigned int pstate)
@@ -173,8 +181,9 @@ void ddr4_swffc(struct dram_info *info, unsigned int pstate)
 	 * Wait until all AXI ports are idle (the uMCTL2 core has to
 	 * be idle).
 	 */
-	while (mmio_read_32(DDRC_PSTAT(0)) & 0x10001)
+	while (mmio_read_32(DDRC_PSTAT(0)) & 0x10001) {
 		;
+	}
 
 	/*
 	 * 4. Write 0 to SBRCTL.scrub_en. Disable SBR, required only if
@@ -191,8 +200,9 @@ void ddr4_swffc(struct dram_info *info, unsigned int pstate)
 	 * 8. Poll DBGCAM.dbg_wr_q_empty and DBGCAM.dbg_rd_q_empty to ensure
 	 * that write and read data buffers are empty.
 	 */
-	while ((mmio_read_32(DDRC_DBGCAM(0)) & 0x06000000) != 0x06000000)
+	while ((mmio_read_32(DDRC_DBGCAM(0)) & 0x06000000) != 0x06000000) {
 		;
+	}
 
 	/*
 	 * 9. For DDR4, update MR6 with the new tDLLK value via the Mode
@@ -203,8 +213,9 @@ void ddr4_swffc(struct dram_info *info, unsigned int pstate)
 	 * 12. Wait until STAT.operating_mode[1:0]!=11 indicating that the
 	 * controller is not in self-refresh mode.
 	 */
-	if ((mmio_read_32(DDRC_STAT(0)) & 0x3) == 0x3)
+	if ((mmio_read_32(DDRC_STAT(0)) & 0x3) == 0x3) {
 		VERBOSE("DRAM is in Self Refresh\n");
+	}
 
 	/*
 	 * 13. Assert PWRCTL.selfref_sw for the DWC_ddr_umctl2 core to enter
@@ -216,8 +227,9 @@ void ddr4_swffc(struct dram_info *info, unsigned int pstate)
 	 * 14. Wait until STAT.operating_mode[1:0]==11 indicating that the
 	 * controller core is in self-refresh mode.
 	 */
-	while ((mmio_read_32(DDRC_STAT(0)) & 0x3f) != 0x23)
+	while ((mmio_read_32(DDRC_STAT(0)) & 0x3f) != 0x23) {
 		;
+	}
 
 	sw_pstate(pstate, drate);
 	dram_cfg_all_mr(info, pstate);
@@ -247,8 +259,9 @@ void ddr4_swffc(struct dram_info *info, unsigned int pstate)
 	mmio_write_32(DDRC_SWCTL(0), 0x1);
 
 	/* wait SWSTAT.sw_done_ack to 1 */
-	while (!(mmio_read_32(DDRC_SWSTAT(0)) & 0x1))
+	while (!(mmio_read_32(DDRC_SWSTAT(0)) & 0x1)) {
 		;
+	}
 
 	/* enable auto self refresh after swffc done */
 	mmio_setbits_32(DDRC_PWRCTL(0), BIT(0));
