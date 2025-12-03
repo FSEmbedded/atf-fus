@@ -314,15 +314,6 @@ void imx_domain_suspend(const psci_power_state_t *target_state)
 {
 	unsigned int cpu = MPIDR_AFFLVL0_VAL(read_mpidr_el1());
 
-	/* NODE:
-	 * ensures, that TPM5 CLK is enabled during suspend
-	 * This setting is required for PD/DPD functionality
-	 *
-	 * Without this setting, Wakeup form Suspend is not possible
-	 */
-	mmio_write_32(IMX_PCC3_BASE + 0xd0, 0x92000000);
-	mmio_write_32(IMX_PCC3_BASE + 0xd0, 0xd2000000);
-
 	if (is_local_state_off(CORE_PWR_STATE(target_state))) {
 		plat_gic_cpuif_disable();
 		imx_pwr_set_cpu_entry(cpu, secure_entrypoint);
