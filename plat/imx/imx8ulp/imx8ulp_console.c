@@ -25,6 +25,8 @@
 
 #define PCC_CGC_MASK	0x40000000
 
+uintptr_t CORTEX_A_DBG_UART = 0;
+
 struct	lpuart_info {
 	uintptr_t pcc_lpuart;
 	uintptr_t lpuart_base;
@@ -42,6 +44,17 @@ static int is_cgc_enabled(unsigned long cgc)
 	return !!(mmio_read_32(cgc) & PCC_CGC_MASK);
 }
 
+int is_uart_enabled(uintptr_t uart_base)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(lpuart_info); i++) {
+		if(lpuart_info[i].lpuart_base == uart_base)
+			return is_cgc_enabled(lpuart_info[i].pcc_lpuart);
+	}
+	return 0;
+}
+
 int get_uart_console(console_t *console)
 {
         int i;
@@ -49,6 +62,7 @@ int get_uart_console(console_t *console)
 		if(!is_cgc_enabled(lpuart_info[i].pcc_lpuart))
 			continue;
 
+		CORTEX_A_DBG_UART = lpuart_info[i].lpuart_base;
 		console_lpuart_register(lpuart_info[i].lpuart_base, IMX_BOOT_UART_CLK_IN_HZ,
 			IMX_CONSOLE_BAUDRATE, console);
 		return 0;
