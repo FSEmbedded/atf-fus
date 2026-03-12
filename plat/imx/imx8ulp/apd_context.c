@@ -12,6 +12,7 @@
 
 #include <plat_imx8.h>
 #include <xrdc.h>
+#include <imx8ulp_console.h>
 
 #define PCC_PR	BIT(31)
 #define PFD_VALID_MASK	U(0x40404040)
@@ -20,6 +21,7 @@
 #define S400_MU_RSR	(S400_MU_BASE + 0x12c)
 #define S400_MU_TRx(i)	(S400_MU_BASE + 0x200 + (i) * 4)
 #define S400_MU_RRx(i)	(S400_MU_BASE + 0x280 + (i) * 4)
+#define PCC_CGC_MASK	0x40000000
 
 /*
  * need to re-init the PLL, CGC1, PCC, CMC, XRDC, SIM, GPIO etc.
@@ -29,6 +31,7 @@
 
 extern void imx8ulp_caam_init();
 extern void upower_wait_resp();
+extern uintptr_t CORTEX_A_DBG_UART;
 
 struct plat_gic_ctx imx_gicv3_ctx;
 static uint32_t cmc1_pmprot;
@@ -272,6 +275,12 @@ static uint32_t tpm6[3];
 
 void tpm5_save(void)
 {
+	uint32_t value;
+	value = mmio_read_32(IMX_PCC3_BASE + 0xd0);
+
+	if (!(value & PCC_CGC_MASK))
+		return;
+
 	tpm5[0] = mmio_read_32(0x29340010);
 	tpm5[1] = mmio_read_32(0x29340018);
 	tpm5[2] = mmio_read_32(0x29340020);
@@ -279,6 +288,12 @@ void tpm5_save(void)
 
 void tpm5_restore(void)
 {
+	uint32_t value;
+	value = mmio_read_32(IMX_PCC3_BASE + 0xd0);
+
+	if (!(value & PCC_CGC_MASK))
+		return;
+
 	mmio_write_32(0x29340010, tpm5[0]);
 	mmio_write_32(0x29340018, tpm5[1]);
 	mmio_write_32(0x29340020, tpm5[2]);
@@ -286,6 +301,12 @@ void tpm5_restore(void)
 
 void tpm6_save(void)
 {
+	uint32_t value;
+	value = mmio_read_32(IMX_PCC4_BASE + 0x08);
+
+	if (!(value & PCC_CGC_MASK))
+		return;
+
 	tpm6[0] = mmio_read_32(0x29820010);
 	tpm6[1] = mmio_read_32(0x29820018);
 	tpm6[2] = mmio_read_32(0x29820020);
@@ -293,6 +314,12 @@ void tpm6_save(void)
 
 void tpm6_restore(void)
 {
+	uint32_t value;
+	value = mmio_read_32(IMX_PCC4_BASE + 0x08);
+
+	if (!(value & PCC_CGC_MASK))
+		return;
+
 	mmio_write_32(0x29820010, tpm6[0]);
 	mmio_write_32(0x29820018, tpm6[1]);
 	mmio_write_32(0x29820020, tpm6[2]);
@@ -336,18 +363,24 @@ static uint32_t lpuart_regs[4];
 
 void lpuart_save(void)
 {
-	lpuart_regs[0] = mmio_read_32(IMX_LPUART5_BASE + LPUART_BAUD);
-	lpuart_regs[1] = mmio_read_32(IMX_LPUART5_BASE + LPUART_FIFO);
-	lpuart_regs[2] = mmio_read_32(IMX_LPUART5_BASE + LPUART_WATER);
-	lpuart_regs[3] = mmio_read_32(IMX_LPUART5_BASE + LPUART_CTRL);
+	if (!is_uart_enabled(CORTEX_A_DBG_UART))
+		return;
+
+	lpuart_regs[0] = mmio_read_32(CORTEX_A_DBG_UART + LPUART_BAUD);
+	lpuart_regs[1] = mmio_read_32(CORTEX_A_DBG_UART + LPUART_FIFO);
+	lpuart_regs[2] = mmio_read_32(CORTEX_A_DBG_UART + LPUART_WATER);
+	lpuart_regs[3] = mmio_read_32(CORTEX_A_DBG_UART + LPUART_CTRL);
 }
 
 void lpuart_restore(void)
 {
-	mmio_write_32(IMX_LPUART5_BASE + LPUART_BAUD, lpuart_regs[0]);
-	mmio_write_32(IMX_LPUART5_BASE + LPUART_FIFO, lpuart_regs[1]);
-	mmio_write_32(IMX_LPUART5_BASE + LPUART_WATER, lpuart_regs[2]);
-	mmio_write_32(IMX_LPUART5_BASE + LPUART_CTRL, lpuart_regs[3]);
+	if (!is_uart_enabled(CORTEX_A_DBG_UART))
+		return;
+
+	mmio_write_32(CORTEX_A_DBG_UART + LPUART_BAUD, lpuart_regs[0]);
+	mmio_write_32(CORTEX_A_DBG_UART + LPUART_FIFO, lpuart_regs[1]);
+	mmio_write_32(CORTEX_A_DBG_UART + LPUART_WATER, lpuart_regs[2]);
+	mmio_write_32(CORTEX_A_DBG_UART + LPUART_CTRL, lpuart_regs[3]);
 }
 
 
@@ -478,11 +511,7 @@ void imx_apd_ctx_save(unsigned int proc_num)
 
 	iomuxc_save();
 
-	tpm5_save();
-
-#if defined(IMX8ULP_TPM_TIMERS)
 	tpm6_save();
-#endif
 
 	lpuart_save();
 
@@ -542,11 +571,7 @@ void imx_apd_ctx_restore(unsigned int proc_num)
 
 	iomuxc_restore();
 
-	tpm5_restore();
-
-#if defined(IMX8ULP_TPM_TIMERS)
 	tpm6_restore();
-#endif
 
 	xrdc_reinit();
 
