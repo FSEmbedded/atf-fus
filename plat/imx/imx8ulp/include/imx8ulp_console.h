@@ -17,5 +17,6 @@
 
 int get_uart_console(console_t *console);
 int is_uart_enabled(uintptr_t uart_base);
+int enable_uart_console(uintptr_t uart_base);
 
 #endif /* __IMX8ULP_CONSOLE */

@@ -55,6 +55,19 @@ int is_uart_enabled(uintptr_t uart_base)
 	return 0;
 }
 
+int enable_uart_console(uintptr_t uart_base)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(lpuart_info); i++) {
+		if(lpuart_info[i].lpuart_base == uart_base) {
+			mmio_setbits_32(lpuart_info[i].pcc_lpuart, PCC_CGC_MASK);
+			return 0;
+		}
+	}
+	return -1;
+}
+
 int get_uart_console(console_t *console)
 {
         int i;

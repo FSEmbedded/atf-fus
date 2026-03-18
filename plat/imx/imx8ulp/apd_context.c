@@ -370,6 +370,10 @@ void lpuart_save(void)
 	lpuart_regs[1] = mmio_read_32(CORTEX_A_DBG_UART + LPUART_FIFO);
 	lpuart_regs[2] = mmio_read_32(CORTEX_A_DBG_UART + LPUART_WATER);
 	lpuart_regs[3] = mmio_read_32(CORTEX_A_DBG_UART + LPUART_CTRL);
+
+	/* FIXME: make uart work for ATF */
+	/* NOTE: enable TE/RE in ctrl */
+	lpuart_regs[3] |= 0xc0000;
 }
 
 void lpuart_restore(void)
@@ -477,8 +481,8 @@ void imx_apd_ctx_save(unsigned int proc_num)
 	unsigned int i;
 	uint32_t val;
 
-	/* enable LPUART5's clock by default */
-	mmio_setbits_32(IMX_PCC3_BASE + 0xe8, BIT(30));
+	/* enable LPUART clock by default */
+	enable_uart_console(CORTEX_A_DBG_UART);
 
 	/* save the gic config */
 	plat_gic_save(proc_num, &imx_gicv3_ctx);
@@ -584,14 +588,11 @@ void imx_apd_ctx_restore(unsigned int proc_num)
 	mmio_write_32(IMX_CMC1_BASE + 0x18, cmc1_pmprot);
 	mmio_write_32(IMX_CMC1_BASE + 0x8c, cmc1_srie);
 
-	/* enable LPUART5's clock by default */
-	mmio_setbits_32(IMX_PCC3_BASE + 0xe8, BIT(30));
+	/* enable LPUART clock by default */
+	enable_uart_console(CORTEX_A_DBG_UART);
 
 	/* restore the console lpuart */
 	lpuart_restore();
-
-	/* FIXME: make uart work for ATF */
-	mmio_write_32(0x293a0018, 0xc0000);
 
 	/* Allow M core to reset A core */
 	mmio_clrbits_32(IMX_MU0B_BASE + 0x10, BIT(2));
